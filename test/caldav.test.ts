@@ -692,3 +692,134 @@ describe("PROPFIND supported-calendar-component-set", () => {
 		expect(xml).not.toContain('<c:comp name="VTODO"/>');
 	});
 });
+
+// === 13. ETag SHA-256 ===
+
+describe("ETag SHA-256", () => {
+	let calendarId: number;
+	beforeAll(async () => {
+		calendarId = await seedCalendar("ETag Test", "VTODO");
+	});
+
+	it("PUT returns ETag as 64-char hex wrapped in quotes", async () => {
+		const ics = makeVtodo("etag-sha-1", "SHA ETag test");
+		const res = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/etag-sha-1.ics`,
+			{
+				body: ics,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		expect(res.status).toBe(201);
+		const etag = res.headers.get("ETag");
+		expect(etag).toBeTruthy();
+		// SHA-256 hex = 64 chars, wrapped in quotes = 66 chars
+		expect(etag).toMatch(/^"[0-9a-f]{64}"$/);
+	});
+
+	it("GET returns same SHA-256 ETag as PUT", async () => {
+		const ics = makeVtodo("etag-sha-2", "SHA ETag consistency");
+		const putRes = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/etag-sha-2.ics`,
+			{
+				body: ics,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		const putEtag = putRes.headers.get("ETag");
+
+		const getRes = await request(
+			"GET",
+			`/dav/projects/${calendarId}/etag-sha-2.ics`,
+		);
+		const getEtag = getRes.headers.get("ETag");
+		expect(getEtag).toBe(putEtag);
+	});
+});
+
+// === 14. PROPFIND property filtering ===
+
+describe("PROPFIND property filtering", () => {
+	let calendarId: number;
+	beforeAll(async () => {
+		calendarId = await seedCalendar("PropFilter Test", "VTODO");
+		const ics = makeVtodo("propfilter-1", "Filter test item");
+		await request(
+			"PUT",
+			`/dav/projects/${calendarId}/propfilter-1.ics`,
+			{
+				body: ics,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+	});
+
+	it("returns only getetag when only getetag is requested", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop>
+    <d:getetag/>
+  </d:prop>
+</d:propfind>`;
+
+		const res = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			body,
+			headers: { Depth: "1" },
+		});
+		expect(res.status).toBe(207);
+		const xml = await res.text();
+		expect(xml).toContain("getetag");
+		expect(xml).not.toContain("<d:displayname>");
+		expect(xml).not.toContain("getcontenttype");
+		expect(xml).not.toContain("supported-report-set");
+	});
+
+	it("returns only displayname when only displayname is requested", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop>
+    <d:displayname/>
+  </d:prop>
+</d:propfind>`;
+
+		const res = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			body,
+			headers: { Depth: "0" },
+		});
+		expect(res.status).toBe(207);
+		const xml = await res.text();
+		expect(xml).toContain("<d:displayname>");
+		expect(xml).not.toContain("getetag");
+		expect(xml).not.toContain("getctag");
+	});
+
+	it("returns all props when no body is sent", async () => {
+		const res = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			headers: { Depth: "0" },
+		});
+		expect(res.status).toBe(207);
+		const xml = await res.text();
+		expect(xml).toContain("<d:displayname>");
+		expect(xml).toContain("resourcetype");
+		expect(xml).toContain("getctag");
+	});
+
+	it("returns all props with allprop", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:allprop/>
+</d:propfind>`;
+
+		const res = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			body,
+			headers: { Depth: "0" },
+		});
+		expect(res.status).toBe(207);
+		const xml = await res.text();
+		expect(xml).toContain("<d:displayname>");
+		expect(xml).toContain("resourcetype");
+		expect(xml).toContain("getctag");
+	});
+});

@@ -159,7 +159,7 @@ export async function putObject(
 	uid: string,
 	icsData: string,
 ): Promise<{ object: CalendarObject; created: boolean }> {
-	const etag = generateEtag(icsData);
+	const etag = await generateEtag(icsData);
 	const existing = await getObjectByUid(db, calendarId, uid);
 
 	if (existing) {
@@ -248,14 +248,14 @@ async function recordChange(
 		.run();
 }
 
-function generateEtag(data: string): string {
-	let hash = 0;
-	for (let i = 0; i < data.length; i++) {
-		const char = data.charCodeAt(i);
-		hash = (hash << 5) - hash + char;
-		hash |= 0; // to 32bit int
-	}
-	return `"${Math.abs(hash).toString(16)}"`;
+async function generateEtag(data: string): Promise<string> {
+	const encoded = new TextEncoder().encode(data);
+	const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+	const hashArray = new Uint8Array(hashBuffer);
+	const hex = Array.from(hashArray, (b) => b.toString(16).padStart(2, "0")).join(
+		"",
+	);
+	return `"${hex}"`;
 }
 
 function rowToCalendar(row: Record<string, unknown>): Calendar {

@@ -33,6 +33,7 @@ import {
 	buildUnauthorizedResponse,
 	calendarCollectionProps,
 	getDepthHeader,
+	parsePropFilter,
 } from "./xml.js";
 
 const MAX_BODY_SIZE = 256 * 1024; // 256KB
@@ -192,7 +193,9 @@ export function registerCaldavRoutes(
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
-		return buildPrincipalResponse(c, user);
+		const read = await readBodyWithLimit(c);
+		const filter = parsePropFilter("error" in read ? "" : read.body);
+		return buildPrincipalResponse(c, user, filter);
 	};
 
 	const handleEntry = async (c: Context<{ Bindings: CloudflareBindings }>) => {
@@ -200,7 +203,9 @@ export function registerCaldavRoutes(
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
-		return buildEntryResponse(c, user);
+		const read = await readBodyWithLimit(c);
+		const filter = parsePropFilter("error" in read ? "" : read.body);
+		return buildEntryResponse(c, user, filter);
 	};
 
 	const handleProjects = async (
@@ -211,8 +216,10 @@ export function registerCaldavRoutes(
 			return buildUnauthorizedResponse(c);
 		}
 		const depth = getDepthHeader(c.req.header("depth"));
+		const read = await readBodyWithLimit(c);
+		const filter = parsePropFilter("error" in read ? "" : read.body);
 		const calendars = await getCalendarsForUser(c.env.DB, user.id);
-		return buildCalendarCollectionResponse(c, user, calendars, depth);
+		return buildCalendarCollectionResponse(c, user, calendars, depth, filter);
 	};
 
 	const handleProject = async (
@@ -223,6 +230,8 @@ export function registerCaldavRoutes(
 			return buildUnauthorizedResponse(c);
 		}
 		const depth = getDepthHeader(c.req.header("depth"));
+		const read = await readBodyWithLimit(c);
+		const filter = parsePropFilter("error" in read ? "" : read.body);
 		const cal = await getCalendarById(
 			c.env.DB,
 			user.id,
@@ -233,9 +242,9 @@ export function registerCaldavRoutes(
 		}
 		if (depth === "1") {
 			const objects = await getObjectsForCalendar(c.env.DB, cal.id);
-			return buildCalendarWithObjectsResponse(c, cal, objects);
+			return buildCalendarWithObjectsResponse(c, cal, objects, filter);
 		}
-		return buildCalendarResponse(c, cal);
+		return buildCalendarResponse(c, cal, filter);
 	};
 
 	const handleReport = async (c: Context<{ Bindings: CloudflareBindings }>) => {
@@ -510,6 +519,8 @@ export function registerCaldavRoutes(
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
+		const read = await readBodyWithLimit(c);
+		const filter = parsePropFilter("error" in read ? "" : read.body);
 		const cal = await getCalendarById(
 			c.env.DB,
 			user.id,
@@ -526,7 +537,7 @@ export function registerCaldavRoutes(
 		if (!obj) {
 			return c.text("Object not found", 404);
 		}
-		return buildObjectResponse(c, cal, obj);
+		return buildObjectResponse(c, cal, obj, filter);
 	});
 
 	// PUT (create or update) object

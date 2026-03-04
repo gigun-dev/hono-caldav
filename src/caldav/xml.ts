@@ -8,6 +8,37 @@ const DAV_HEADERS = {
 	DAV: "1, calendar-access",
 };
 
+export type PropFilter = Set<string> | "allprop";
+
+export function parsePropFilter(body: string): PropFilter {
+	if (!body.trim()) return "allprop";
+	if (/<(?:[^:>]+:)?allprop\s*\/?>/i.test(body)) return "allprop";
+
+	// Match <d:prop>...</d:prop> or <prop>...</prop>
+	const propBlockMatch = body.match(
+		/<(?:[^:>]+:)?prop\b[^>]*>([\s\S]*?)<\/(?:[^:>]+:)?prop>/i,
+	);
+	if (!propBlockMatch) return "allprop";
+
+	const propBlock = propBlockMatch[1];
+	const props = new Set<string>();
+	// Extract local names from self-closing or opening tags inside <d:prop>
+	const tagRegex = /<(?:[^:>]+:)?(\S+?)[\s/>]/g;
+	let m: RegExpExecArray | null;
+	while ((m = tagRegex.exec(propBlock)) !== null) {
+		const name = m[1].toLowerCase();
+		if (name && !name.startsWith("/")) {
+			props.add(name);
+		}
+	}
+	return props.size > 0 ? props : "allprop";
+}
+
+function shouldInclude(filter: PropFilter, propName: string): boolean {
+	if (filter === "allprop") return true;
+	return filter.has(propName);
+}
+
 function xmlEscape(value: string): string {
 	return value
 		.replace(/&/g, "&amp;")
@@ -75,55 +106,93 @@ function collectionProps(
 	resType: string,
 	extra: string = "",
 	ctag?: string,
+	filter: PropFilter = "allprop",
 ): string {
-	const ctagProp = ctag
-		? `
-        <cs:getctag xmlns:cs="http://calendarserver.org/ns/">${xmlEscape(ctag)}</cs:getctag>`
-		: "";
-	return `
-        <d:displayname>${xmlEscape(displayName)}</d:displayname>
-        <d:resourcetype>${resType}</d:resourcetype>${ctagProp}
-        ${extra}`.trimEnd();
+	let result = "";
+	if (shouldInclude(filter, "displayname")) {
+		result += `
+        <d:displayname>${xmlEscape(displayName)}</d:displayname>`;
+	}
+	if (shouldInclude(filter, "resourcetype")) {
+		result += `
+        <d:resourcetype>${resType}</d:resourcetype>`;
+	}
+	if (ctag && shouldInclude(filter, "getctag")) {
+		result += `
+        <cs:getctag xmlns:cs="http://calendarserver.org/ns/">${xmlEscape(ctag)}</cs:getctag>`;
+	}
+	if (extra) {
+		result += `
+        ${extra}`;
+	}
+	return result.trimEnd();
 }
 
-function objectProps(obj: CalendarObject, componentType: string): string {
-	return `
-        <d:getetag>${xmlEscape(obj.etag)}</d:getetag>
-        <d:getcontenttype>text/calendar; charset=utf-8; component=${componentType}</d:getcontenttype>
-        <d:getcontentlength>${obj.icsData.length}</d:getcontentlength>
+function objectProps(
+	obj: CalendarObject,
+	componentType: string,
+	filter: PropFilter = "allprop",
+): string {
+	let result = "";
+	if (shouldInclude(filter, "getetag")) {
+		result += `
+        <d:getetag>${xmlEscape(obj.etag)}</d:getetag>`;
+	}
+	if (shouldInclude(filter, "getcontenttype")) {
+		result += `
+        <d:getcontenttype>text/calendar; charset=utf-8; component=${componentType}</d:getcontenttype>`;
+	}
+	if (shouldInclude(filter, "getcontentlength")) {
+		result += `
+        <d:getcontentlength>${obj.icsData.length}</d:getcontentlength>`;
+	}
+	if (shouldInclude(filter, "getlastmodified")) {
+		result += `
         <d:getlastmodified>${new Date(obj.updatedAt).toUTCString()}</d:getlastmodified>`;
+	}
+	return result;
 }
 
 function calendarCollectionExtra(
 	componentType: string,
 	color: string | null,
 	calendarOrder: number | null,
+	filter: PropFilter = "allprop",
 ): string {
-	const colorProp = color
-		? `
-        <ical:calendar-color>${xmlEscape(color)}</ical:calendar-color>`
-		: "";
-	const orderProp =
-		calendarOrder != null
-			? `
-        <ical:calendar-order>${calendarOrder}</ical:calendar-order>`
-			: "";
-	return `
+	let result = "";
+	if (shouldInclude(filter, "supported-calendar-component-set")) {
+		result += `
         <c:supported-calendar-component-set>
           <c:comp name="${componentType}"/>
-        </c:supported-calendar-component-set>
+        </c:supported-calendar-component-set>`;
+	}
+	if (shouldInclude(filter, "supported-report-set")) {
+		result += `
         <d:supported-report-set>
           <d:supported-report><d:report><c:calendar-query/></d:report></d:supported-report>
           <d:supported-report><d:report><c:calendar-multiget/></d:report></d:supported-report>
           <d:supported-report><d:report><d:sync-collection/></d:report></d:supported-report>
-        </d:supported-report-set>
+        </d:supported-report-set>`;
+	}
+	if (shouldInclude(filter, "current-user-privilege-set")) {
+		result += `
         <d:current-user-privilege-set>
           <d:privilege><d:read/></d:privilege>
           <d:privilege><d:write/></d:privilege>
           <d:privilege><d:write-content/></d:privilege>
           <d:privilege><d:bind/></d:privilege>
           <d:privilege><d:unbind/></d:privilege>
-        </d:current-user-privilege-set>${colorProp}${orderProp}`;
+        </d:current-user-privilege-set>`;
+	}
+	if (color && shouldInclude(filter, "calendar-color")) {
+		result += `
+        <ical:calendar-color>${xmlEscape(color)}</ical:calendar-color>`;
+	}
+	if (calendarOrder != null && shouldInclude(filter, "calendar-order")) {
+		result += `
+        <ical:calendar-order>${calendarOrder}</ical:calendar-order>`;
+	}
+	return result;
 }
 
 export function getDepthHeader(depthHeader?: string): "0" | "1" {
@@ -139,32 +208,48 @@ export function buildUnauthorizedResponse(c: Context) {
 	});
 }
 
-export function buildEntryResponse(c: Context, user: CaldavUser) {
-	const props = collectionProps(
-		"CalDAV",
-		"<d:collection/>",
-		`
+export function buildEntryResponse(
+	c: Context,
+	user: CaldavUser,
+	filter: PropFilter = "allprop",
+) {
+	const extra = shouldInclude(filter, "current-user-principal")
+		? `
         <d:current-user-principal>
           <d:href>${href(`/dav/principals/${user.username}`)}</d:href>
-        </d:current-user-principal>`,
-	);
+        </d:current-user-principal>`
+		: "";
+	const props = collectionProps("CalDAV", "<d:collection/>", extra, undefined, filter);
 	return c.body(multistatus(responseFor(href("/dav/"), props)), 207, {
 		...DAV_HEADERS,
 		"Content-Type": "application/xml; charset=utf-8",
 	});
 }
 
-export function buildPrincipalResponse(c: Context, user: CaldavUser) {
+export function buildPrincipalResponse(
+	c: Context,
+	user: CaldavUser,
+	filter: PropFilter = "allprop",
+) {
+	let extra = "";
+	if (shouldInclude(filter, "calendar-home-set")) {
+		extra += `
+        <c:calendar-home-set>
+          <d:href>${href("/dav/projects/")}</d:href>
+        </c:calendar-home-set>`;
+	}
+	if (shouldInclude(filter, "current-user-principal")) {
+		extra += `
+        <d:current-user-principal>
+          <d:href>${href(`/dav/principals/${user.username}`)}</d:href>
+        </d:current-user-principal>`;
+	}
 	const props = collectionProps(
 		user.displayName ?? user.username,
 		"<d:collection/><d:principal/>",
-		`
-        <c:calendar-home-set>
-          <d:href>${href("/dav/projects/")}</d:href>
-        </c:calendar-home-set>
-        <d:current-user-principal>
-          <d:href>${href(`/dav/principals/${user.username}`)}</d:href>
-        </d:current-user-principal>`,
+		extra,
+		undefined,
+		filter,
 	);
 	return c.body(
 		multistatus(responseFor(href(`/dav/principals/${user.username}`), props)),
@@ -181,23 +266,33 @@ export function buildCalendarCollectionResponse(
 	user: CaldavUser,
 	calendars: Calendar[],
 	depth: "0" | "1",
+	filter: PropFilter = "allprop",
 ) {
-	let responses = responseFor(
-		href("/dav/projects/"),
-		collectionProps(
-			`${user.username} Calendars`,
-			"<d:collection/>",
-			`
+	let extra = "";
+	if (shouldInclude(filter, "supported-calendar-component-set")) {
+		extra += `
         <c:supported-calendar-component-set>
           <c:comp name="VTODO"/>
           <c:comp name="VEVENT"/>
-        </c:supported-calendar-component-set>
+        </c:supported-calendar-component-set>`;
+	}
+	if (shouldInclude(filter, "current-user-privilege-set")) {
+		extra += `
         <d:current-user-privilege-set>
           <d:privilege><d:read/></d:privilege>
           <d:privilege><d:write/></d:privilege>
           <d:privilege><d:bind/></d:privilege>
           <d:privilege><d:unbind/></d:privilege>
-        </d:current-user-privilege-set>`,
+        </d:current-user-privilege-set>`;
+	}
+	let responses = responseFor(
+		href("/dav/projects/"),
+		collectionProps(
+			`${user.username} Calendars`,
+			"<d:collection/>",
+			extra,
+			undefined,
+			filter,
 		),
 	);
 
@@ -205,7 +300,7 @@ export function buildCalendarCollectionResponse(
 		for (const cal of calendars) {
 			responses += responseFor(
 				href(`/dav/projects/${cal.id}`),
-				calendarCollectionProps(cal),
+				calendarCollectionProps(cal, filter),
 			);
 		}
 	}
@@ -216,17 +311,25 @@ export function buildCalendarCollectionResponse(
 	});
 }
 
-export function calendarCollectionProps(cal: Calendar): string {
+export function calendarCollectionProps(
+	cal: Calendar,
+	filter: PropFilter = "allprop",
+): string {
 	return collectionProps(
 		cal.name,
 		"<d:collection/><c:calendar/>",
-		calendarCollectionExtra(cal.componentType, cal.color, cal.calendarOrder),
+		calendarCollectionExtra(cal.componentType, cal.color, cal.calendarOrder, filter),
 		cal.ctag,
+		filter,
 	);
 }
 
-export function buildCalendarResponse(c: Context, cal: Calendar) {
-	const props = calendarCollectionProps(cal);
+export function buildCalendarResponse(
+	c: Context,
+	cal: Calendar,
+	filter: PropFilter = "allprop",
+) {
+	const props = calendarCollectionProps(cal, filter);
 	return c.body(
 		multistatus(responseFor(href(`/dav/projects/${cal.id}`), props)),
 		207,
@@ -241,15 +344,16 @@ export function buildCalendarWithObjectsResponse(
 	c: Context,
 	cal: Calendar,
 	objects: CalendarObject[],
+	filter: PropFilter = "allprop",
 ) {
 	let responses = responseFor(
 		href(`/dav/projects/${cal.id}`),
-		calendarCollectionProps(cal),
+		calendarCollectionProps(cal, filter),
 	);
 	for (const obj of objects) {
 		responses += responseFor(
 			href(`/dav/projects/${cal.id}/${obj.uid}.ics`),
-			objectProps(obj, cal.componentType),
+			objectProps(obj, cal.componentType, filter),
 		);
 	}
 	return c.body(multistatus(responses), 207, {
@@ -262,8 +366,9 @@ export function buildObjectResponse(
 	c: Context,
 	cal: Calendar,
 	obj: CalendarObject,
+	filter: PropFilter = "allprop",
 ) {
-	const props = objectProps(obj, cal.componentType);
+	const props = objectProps(obj, cal.componentType, filter);
 	return c.body(
 		multistatus(
 			responseFor(href(`/dav/projects/${cal.id}/${obj.uid}.ics`), props),
