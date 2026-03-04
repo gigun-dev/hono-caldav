@@ -1,6 +1,6 @@
 # hono-vtodo
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gigun-dev/hono-vtodo)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gigun-dev/hono-caldav)
 
 Cloudflare Workers 上で動く CalDAV VTODO サーバー。
 iOS リマインダーなどの CalDAV クライアントからタスクを同期できる。
