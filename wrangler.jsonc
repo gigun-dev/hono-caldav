@@ -1,0 +1,18 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "vtodo",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-01-26",
+	"compatibility_flags": ["nodejs_compat"],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "vtodo-db",
+			"database_id": "92573363-5b9f-4456-bb42-5beebb9b6cab",
+		},
+	],
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1,
+	},
+}

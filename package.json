@@ -1,0 +1,23 @@
+{
+	"name": "vtodo",
+	"type": "module",
+	"scripts": {
+		"dev": "wrangler dev",
+		"dev:proxy": "bun run proxy/dev.ts",
+		"deploy": "wrangler deploy --minify",
+		"test": "vitest run",
+		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
+		"db:migrate:local": "wrangler d1 migrations apply vtodo-db --local",
+		"db:migrate:remote": "wrangler d1 migrations apply vtodo-db --remote"
+	},
+	"dependencies": {
+		"hono": "^4.11.5",
+		"ical.js": "^2.2.1"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.8.0",
+		"prettier": "^3.8.1",
+		"vitest": "~3.0.0",
+		"wrangler": "^4.69.0"
+	}
+}
