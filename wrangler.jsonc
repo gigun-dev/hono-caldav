@@ -7,8 +7,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "vtodo-db",
-			"database_id": "92573363-5b9f-4456-bb42-5beebb9b6cab",
+			"database_name": "hono-caldav",
+			"database_id": "256b87d7-86a1-400b-a19d-004796e611d2",
 		},
 	],
 	"observability": {
