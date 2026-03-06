@@ -12,6 +12,7 @@
 		"db:migrate:remote": "wrangler d1 migrations apply hono-caldav --remote"
 	},
 	"dependencies": {
+		"better-auth": "^1.5.4",
 		"hono": "^4.11.5",
 		"ical.js": "^2.2.1"
 	},

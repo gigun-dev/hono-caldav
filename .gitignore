@@ -31,6 +31,7 @@ lerna-debug.log*
 
 # misc
 .DS_Store
+local-d1.sqlite
 
 # temp
 temp/
