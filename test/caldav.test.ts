@@ -109,6 +109,21 @@ describe("PROPFIND", () => {
 		calendarId = await seedCalendar("Test Calendar", "VTODO");
 	});
 
+	it("PROPFIND / returns multistatus with current-user-principal", async () => {
+		const res = await request("PROPFIND", "/");
+		expect(res.status).toBe(207);
+		const xml = await res.text();
+		expect(xml).toContain("current-user-principal");
+		expect(xml).toContain("/dav/principals/test-user/");
+	});
+
+	it("OPTIONS / returns 204 with DAV headers", async () => {
+		const res = await request("OPTIONS", "/");
+		expect(res.status).toBe(204);
+		expect(res.headers.get("DAV")).toContain("calendar-access");
+		expect(res.headers.get("Allow")).toContain("PROPFIND");
+	});
+
 	it("PROPFIND /dav/ returns multistatus with current-user-principal", async () => {
 		const res = await request("PROPFIND", "/dav/");
 		expect(res.status).toBe(207);
@@ -152,6 +167,43 @@ describe("PROPFIND", () => {
 		const xml = await res.text();
 		expect(xml).toContain("Test Calendar");
 		expect(xml).toContain("<c:calendar/>");
+	});
+
+	it("PROPFIND /dav/projects/:id returns sync-token when requested", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop>
+    <d:sync-token/>
+    <cs:getctag xmlns:cs="http://calendarserver.org/ns/"/>
+  </d:prop>
+</d:propfind>`;
+
+		const res = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			body,
+			headers: { Depth: "0" },
+		});
+		expect(res.status).toBe(207);
+		const xml = await res.text();
+		expect(xml).toContain("<d:sync-token>");
+		expect(xml).toContain("getctag");
+	});
+
+	it("PROPFIND /dav/projects/ depth 1 returns sync-token for each calendar", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop>
+    <d:displayname/>
+    <d:sync-token/>
+  </d:prop>
+</d:propfind>`;
+
+		const res = await request("PROPFIND", "/dav/projects/", {
+			body,
+			headers: { Depth: "1" },
+		});
+		expect(res.status).toBe(207);
+		const xml = await res.text();
+		expect(xml).toContain("<d:sync-token>");
 	});
 });
 
@@ -569,6 +621,39 @@ describe("Extended MKCOL", () => {
 			body,
 		});
 		expect(res.status).toBe(401);
+	});
+
+	it("MKCOL saves calendar-color and calendar-order", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<d:mkcol xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:ical="http://apple.com/ns/ical/">
+  <d:set>
+    <d:prop>
+      <d:resourcetype><d:collection/><c:calendar/></d:resourcetype>
+      <d:displayname>Colored Tasks</d:displayname>
+      <c:supported-calendar-component-set>
+        <c:comp name="VTODO"/>
+      </c:supported-calendar-component-set>
+      <ical:calendar-color>#FF0000</ical:calendar-color>
+      <ical:calendar-order>3</ical:calendar-order>
+    </d:prop>
+  </d:set>
+</d:mkcol>`;
+
+		const res = await request("MKCOL", "/dav/projects/colored-tasks", {
+			body,
+		});
+		expect(res.status).toBe(201);
+		const location = res.headers.get("Location")!;
+		expect(location).toBeTruthy();
+
+		// PROPFIND the created calendar to verify color and order
+		const propRes = await request("PROPFIND", location, {
+			headers: { Depth: "0" },
+		});
+		expect(propRes.status).toBe(207);
+		const xml = await propRes.text();
+		expect(xml).toContain("#FF0000");
+		expect(xml).toContain("<ical:calendar-order>3</ical:calendar-order>");
 	});
 
 	it("returns 400 for invalid component type", async () => {

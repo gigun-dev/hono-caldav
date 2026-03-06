@@ -315,10 +315,15 @@ export function calendarCollectionProps(
 	cal: Calendar,
 	filter: PropFilter = "allprop",
 ): string {
+	let extra = calendarCollectionExtra(cal.componentType, cal.color, cal.calendarOrder, filter);
+	if (shouldInclude(filter, "sync-token")) {
+		extra += `
+        <d:sync-token>${String(cal.synctoken)}</d:sync-token>`;
+	}
 	return collectionProps(
 		cal.name,
 		"<d:collection/><c:calendar/>",
-		calendarCollectionExtra(cal.componentType, cal.color, cal.calendarOrder, filter),
+		extra,
 		cal.ctag,
 		filter,
 	);

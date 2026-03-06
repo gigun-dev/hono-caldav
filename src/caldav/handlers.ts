@@ -100,6 +100,8 @@ function parseProppatchCalendarOrder(body: string): number | null {
 function parseMkcalendarBody(body: string): {
 	displayName: string | null;
 	componentType: string | null;
+	color: string | null;
+	order: number | null;
 } {
 	const displayNameMatch = body.match(
 		/<(?:[^:>]+:)?displayname[^>]*>([^<]*)<\/(?:[^:>]+:)?displayname>/i,
@@ -109,12 +111,17 @@ function parseMkcalendarBody(body: string): {
 	const compMatch = body.match(/<(?:[^:>]+:)?comp\s+name="([^"]+)"/i);
 	const componentType = compMatch?.[1]?.toUpperCase() || "VTODO";
 
-	return { displayName, componentType };
+	const color = parseProppatchCalendarColor(body);
+	const order = parseProppatchCalendarOrder(body);
+
+	return { displayName, componentType, color, order };
 }
 
 function parseMkcolBody(body: string): {
 	displayName: string | null;
 	componentType: string | null;
+	color: string | null;
+	order: number | null;
 } {
 	const displayNameMatch = body.match(
 		/<(?:[^:>]+:)?displayname[^>]*>([^<]*)<\/(?:[^:>]+:)?displayname>/i,
@@ -135,7 +142,10 @@ function parseMkcolBody(body: string): {
 		componentType = "VEVENT";
 	}
 
-	return { displayName, componentType };
+	const color = parseProppatchCalendarColor(body);
+	const order = parseProppatchCalendarOrder(body);
+
+	return { displayName, componentType, color, order };
 }
 
 function parseBasicAuth(header: string | undefined): {
@@ -178,6 +188,7 @@ function requireAuth(
 export function registerCaldavRoutes(
 	app: Hono<{ Bindings: CloudflareBindings }>,
 ) {
+	app.on("OPTIONS", "/", (c) => c.body(null, 204, DAV_HEADERS));
 	app.on("OPTIONS", "/dav/*", (c) => c.body(null, 204, DAV_HEADERS));
 
 	app.on("OPTIONS", "/.well-known/caldav", (c) =>
@@ -420,6 +431,8 @@ export function registerCaldavRoutes(
 		parseBody: (body: string) => {
 			displayName: string | null;
 			componentType: string | null;
+			color: string | null;
+			order: number | null;
 		},
 	) => {
 		const user = requireAuth(c);
@@ -430,12 +443,19 @@ export function registerCaldavRoutes(
 		if ("error" in read) {
 			return read.error;
 		}
-		const { displayName, componentType } = parseBody(read.body);
+		const { displayName, componentType, color, order } = parseBody(read.body);
 		if (!componentType || !["VTODO", "VEVENT"].includes(componentType)) {
 			return c.text("Invalid or missing component type", 400);
 		}
 		const name = displayName || "Untitled";
-		const cal = await createCalendar(c.env.DB, user.id, name, componentType);
+		const cal = await createCalendar(
+			c.env.DB,
+			user.id,
+			name,
+			componentType,
+			color,
+			order,
+		);
 		return c.body(null, 201, {
 			Location: `/dav/projects/${cal.id}/`,
 		});
@@ -446,6 +466,8 @@ export function registerCaldavRoutes(
 
 	const handleMkcalendar = (c: Context<{ Bindings: CloudflareBindings }>) =>
 		handleCreateCalendar(c, parseMkcalendarBody);
+
+	app.on("PROPFIND", "/", handleEntry);
 
 	app.on("PROPFIND", "/.well-known/caldav", (c) => c.redirect("/dav/", 301));
 

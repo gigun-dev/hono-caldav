@@ -35,3 +35,6 @@ local-d1.sqlite
 
 # temp
 temp/
+
+*.proxymanlogv2
+Raw_*.folder/

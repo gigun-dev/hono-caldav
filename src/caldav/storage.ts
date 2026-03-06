@@ -69,12 +69,14 @@ export async function createCalendar(
 	userId: string,
 	name: string,
 	componentType: string,
+	color?: string | null,
+	calendarOrder?: number | null,
 ): Promise<Calendar> {
 	const result = await db
 		.prepare(
-			"INSERT INTO calendars (user_id, name, component_type) VALUES (?, ?, ?) RETURNING id, user_id, name, component_type, ctag, synctoken, color, calendar_order, created_at, updated_at",
+			"INSERT INTO calendars (user_id, name, component_type, color, calendar_order) VALUES (?, ?, ?, ?, ?) RETURNING id, user_id, name, component_type, ctag, synctoken, color, calendar_order, created_at, updated_at",
 		)
-		.bind(userId, name, componentType)
+		.bind(userId, name, componentType, color ?? null, calendarOrder ?? null)
 		.first();
 	return rowToCalendar(result as Record<string, unknown>);
 }
