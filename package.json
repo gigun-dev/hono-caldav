@@ -4,6 +4,7 @@
 	"scripts": {
 		"dev": "wrangler dev",
 		"dev:proxy": "bun run proxy/dev.ts",
+		"tunnel": "dotenvx run -- cloudflared tunnel run",
 		"deploy": "wrangler deploy --minify",
 		"test": "vitest run",
 		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
@@ -16,6 +17,7 @@
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.8.0",
+		"@dotenvx/dotenvx": "^1.53.0",
 		"prettier": "^3.8.1",
 		"vitest": "~3.0.0",
 		"wrangler": "^4.69.0"
