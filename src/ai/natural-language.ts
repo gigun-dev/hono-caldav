@@ -39,15 +39,23 @@ export async function processNaturalLanguage(
 
 	const systemPrompt = buildSystemPrompt(existingTasks);
 
-	const response = await ai.run("@cf/meta/llama-3.1-8b-instruct" as BaseAiTextGenerationModels, {
-		messages: [
-			{ role: "system", content: systemPrompt },
-			{ role: "user", content: input },
-		],
-		max_tokens: 500,
-	});
-
-	const aiText = (response as { response?: string }).response ?? "";
+	let aiText: string;
+	try {
+		const response = await ai.run("@cf/meta/llama-3.1-8b-instruct" as BaseAiTextGenerationModels, {
+			messages: [
+				{ role: "system", content: systemPrompt },
+				{ role: "user", content: input.slice(0, 1000) },
+			],
+			max_tokens: 500,
+			temperature: 0,
+		});
+		aiText = (response as { response?: string }).response ?? "";
+	} catch (err) {
+		return {
+			action: "error",
+			message: `AI service error: ${err instanceof Error ? err.message : "unknown"}`,
+		};
+	}
 
 	const parsed = parseAiResponse(aiText);
 	if (!parsed) {
@@ -114,7 +122,7 @@ export async function executeAction(
 
 	switch (action) {
 		case "create": {
-			const summary = String(parsed.summary ?? "Untitled");
+			const summary = sanitizeIcsValue(String(parsed.summary ?? "Untitled"));
 			const uid = crypto.randomUUID();
 			const now = formatTimestamp(new Date());
 			const lines = [
@@ -128,11 +136,12 @@ export async function executeAction(
 				`SUMMARY:${summary}`,
 				"STATUS:NEEDS-ACTION",
 			];
-			if (parsed.due) lines.push(`DUE:${parsed.due}`);
+			if (parsed.due) lines.push(`DUE:${sanitizeIcsValue(String(parsed.due))}`);
 			if (parsed.priority !== undefined && parsed.priority !== null) {
-				lines.push(`PRIORITY:${parsed.priority}`);
+				const p = Math.max(1, Math.min(9, Number(parsed.priority) || 5));
+				lines.push(`PRIORITY:${p}`);
 			}
-			if (parsed.description) lines.push(`DESCRIPTION:${parsed.description}`);
+			if (parsed.description) lines.push(`DESCRIPTION:${sanitizeIcsValue(String(parsed.description))}`);
 			lines.push("END:VTODO", "END:VCALENDAR");
 
 			await putObject(db, calendarId, uid, lines.join("\r\n") + "\r\n");
@@ -188,10 +197,10 @@ export async function executeAction(
 			let ics = obj.icsData;
 			const now = formatTimestamp(new Date());
 			if (parsed.summary !== undefined && parsed.summary !== null) {
-				ics = replaceOrInsertProp(ics, "SUMMARY", String(parsed.summary));
+				ics = replaceOrInsertProp(ics, "SUMMARY", sanitizeIcsValue(String(parsed.summary)));
 			}
 			if (parsed.due !== undefined && parsed.due !== null) {
-				ics = replaceOrInsertProp(ics, "DUE", String(parsed.due));
+				ics = replaceOrInsertProp(ics, "DUE", sanitizeIcsValue(String(parsed.due)));
 			}
 			if (parsed.status !== undefined && parsed.status !== null) {
 				ics = replaceOrInsertProp(ics, "STATUS", String(parsed.status));
@@ -260,6 +269,14 @@ export async function executeAction(
 }
 
 // --- Helpers ---
+
+function sanitizeIcsValue(s: string): string {
+	return s
+		.replace(/\\/g, "\\\\")
+		.replace(/;/g, "\\;")
+		.replace(/,/g, "\\,")
+		.replace(/\r?\n/g, "\\n");
+}
 
 function formatTimestamp(date: Date): string {
 	return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
