@@ -13,6 +13,12 @@ import { DashboardPage } from "./pages/dashboard.js";
 import { SetupPage } from "./pages/setup.js";
 import { generateMobileconfig } from "./setup/mobileconfig.js";
 import { handleMcpRequest } from "./mcp/handler.js";
+import {
+	createScheduledEvent,
+	processReply,
+	processCounter,
+	getEventAttendees,
+} from "./scheduling/api.js";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -103,6 +109,26 @@ app.get("/setup/ios", authGuard, (c) => {
 		"Content-Type": "application/x-apple-aspen-config",
 		"Content-Disposition": 'attachment; filename="caldav.mobileconfig"',
 	});
+});
+
+// --- Scheduling API (iTIP/iMIP) ---
+app.post("/api/scheduling/events", authGuard, async (c) => {
+	const user = c.get("user");
+	return createScheduledEvent(c, user.id);
+});
+
+app.post("/api/scheduling/reply", async (c) => {
+	// Reply endpoint is called by email workers, no session auth
+	// In production, authenticate via a shared secret or webhook token
+	return processReply(c);
+});
+
+app.post("/api/scheduling/counter", async (c) => {
+	return processCounter(c);
+});
+
+app.get("/api/scheduling/events/:uid/attendees", authGuard, async (c) => {
+	return getEventAttendees(c);
 });
 
 // --- MCP endpoint (Streamable HTTP, JSON-RPC) ---
