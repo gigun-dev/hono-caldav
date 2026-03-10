@@ -21,6 +21,9 @@ import {
 	getEventAttendees,
 } from "./scheduling/api.js";
 import { handleEmail } from "./scheduling/email-worker.js";
+import { getValidAccessToken } from "./integrations/google-auth.js";
+import { pollGmailForTasks } from "./integrations/gmail-worker.js";
+import { getCalendarsForUser } from "./caldav/storage.js";
 
 function timingSafeEqualStr(a: string, b: string): boolean {
 	const encoder = new TextEncoder();
@@ -190,7 +193,7 @@ app.all("/mcp", async (c) => {
 		return c.text("Unauthorized", 401);
 	}
 	const userId = c.env.MCP_USER_ID || "default";
-	return handleMcpRequest(c.req.raw, c.env.DB, userId);
+	return handleMcpRequest(c.req.raw, c.env.DB, userId, c.env);
 });
 
 // --- CalDAV routes ---
@@ -200,5 +203,65 @@ export default {
 	fetch: app.fetch,
 	async email(message: ForwardableEmailMessage, env: CloudflareBindings) {
 		await handleEmail(message, env);
+	},
+	async scheduled(
+		controller: ScheduledController,
+		env: CloudflareBindings,
+	) {
+		console.log("[Cron] Gmail poll triggered");
+
+		// Find all users with Google OAuth accounts
+		const accounts = await env.DB
+			.prepare(
+				"SELECT DISTINCT user_id FROM account WHERE provider_id = 'google' AND refresh_token IS NOT NULL",
+			)
+			.all<{ user_id: string }>();
+
+		const users = accounts.results ?? [];
+		if (users.length === 0) {
+			console.log("[Cron] No users with Google OAuth tokens found");
+			return;
+		}
+
+		for (const { user_id: userId } of users) {
+			try {
+				const accessToken = await getValidAccessToken(
+					env.DB,
+					userId,
+					env.GOOGLE_CLIENT_ID,
+					env.GOOGLE_CLIENT_SECRET,
+				);
+				if (!accessToken) {
+					console.error(`[Cron] Could not get access token for user ${userId}`);
+					continue;
+				}
+
+				// Find a VTODO calendar for this user
+				const calendars = await getCalendarsForUser(env.DB, userId);
+				const todoCalendar = calendars.find(
+					(c) => c.componentType === "VTODO",
+				);
+				if (!todoCalendar) {
+					console.log(`[Cron] No VTODO calendar for user ${userId}`);
+					continue;
+				}
+
+				const result = await pollGmailForTasks(
+					env.AI,
+					env.DB,
+					accessToken,
+					userId,
+					todoCalendar.id,
+				);
+				console.log(
+					`[Cron] User ${userId}: created ${result.created} tasks, ${result.errors.length} errors`,
+				);
+				if (result.errors.length > 0) {
+					console.error(`[Cron] Errors:`, result.errors);
+				}
+			} catch (err) {
+				console.error(`[Cron] Error polling for user ${userId}:`, err);
+			}
+		}
 	},
 } satisfies ExportedHandler<CloudflareBindings>;

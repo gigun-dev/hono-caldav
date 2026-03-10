@@ -12,6 +12,9 @@ import {
 	putObject,
 	deleteObject,
 } from "../caldav/storage.js";
+import { pollGmailForTasks } from "../integrations/gmail-worker.js";
+import { getFreeBusy } from "../integrations/google-calendar.js";
+import { getValidAccessToken } from "../integrations/google-auth.js";
 
 type JsonRpcRequest = {
 	jsonrpc: "2.0";
@@ -143,12 +146,52 @@ const TOOLS: ToolDefinition[] = [
 			required: ["calendarId", "query"],
 		},
 	},
+	{
+		name: "poll_gmail",
+		description:
+			"Manually trigger a Gmail poll to extract tasks from recent emails",
+		inputSchema: {
+			type: "object",
+			properties: {
+				calendarId: {
+					type: "number",
+					description: "Target calendar ID for extracted tasks",
+				},
+			},
+			required: ["calendarId"],
+		},
+	},
+	{
+		name: "check_calendar_availability",
+		description:
+			"Check free/busy availability on Google Calendar for a time range",
+		inputSchema: {
+			type: "object",
+			properties: {
+				calendarId: {
+					type: "string",
+					description:
+						'Google Calendar ID (e.g., "primary" or email address)',
+				},
+				timeMin: {
+					type: "string",
+					description: "Start of time range (ISO format)",
+				},
+				timeMax: {
+					type: "string",
+					description: "End of time range (ISO format)",
+				},
+			},
+			required: ["calendarId", "timeMin", "timeMax"],
+		},
+	},
 ];
 
 export async function handleMcpRequest(
 	request: Request,
 	db: D1Database,
 	userId: string,
+	env?: CloudflareBindings,
 ): Promise<Response> {
 	if (request.method === "GET") {
 		// SSE endpoint - not needed for stateless mode
@@ -169,14 +212,14 @@ export async function handleMcpRequest(
 	// Handle batch requests
 	if (Array.isArray(body)) {
 		const results = await Promise.all(
-			body.map((req) => processRequest(req, db, userId)),
+			body.map((req) => processRequest(req, db, userId, env)),
 		);
 		return new Response(JSON.stringify(results), {
 			headers: { "Content-Type": "application/json" },
 		});
 	}
 
-	const result = await processRequest(body, db, userId);
+	const result = await processRequest(body, db, userId, env);
 	// Notifications (no id) get no response
 	if (body.id === undefined) {
 		return new Response(null, { status: 202 });
@@ -190,6 +233,7 @@ async function processRequest(
 	req: JsonRpcRequest,
 	db: D1Database,
 	userId: string,
+	env?: CloudflareBindings,
 ): Promise<JsonRpcResponse> {
 	const id = req.id ?? null;
 
@@ -233,6 +277,7 @@ async function processRequest(
 					userId,
 					params.name,
 					params.arguments ?? {},
+					env,
 				);
 				return { jsonrpc: "2.0", id, result };
 			} catch (err) {
@@ -264,6 +309,7 @@ async function callTool(
 	userId: string,
 	name: string,
 	args: Record<string, unknown>,
+	env?: CloudflareBindings,
 ): Promise<{ content: { type: string; text: string }[]; isError?: boolean }> {
 	switch (name) {
 		case "list_calendars": {
@@ -433,6 +479,95 @@ async function callTool(
 				});
 			return {
 				content: [{ type: "text", text: JSON.stringify(tasks, null, 2) }],
+			};
+		}
+
+		case "poll_gmail": {
+			if (!env) return errorResult("Environment not available");
+			const calendarId = Number(args.calendarId);
+			const cal = await getCalendarById(db, userId, calendarId);
+			if (!cal) return errorResult("Calendar not found");
+
+			const accessToken = await getValidAccessToken(
+				db,
+				userId,
+				env.GOOGLE_CLIENT_ID,
+				env.GOOGLE_CLIENT_SECRET,
+			);
+			if (!accessToken) {
+				return errorResult(
+					"Could not obtain Google access token. Ensure Google OAuth is connected.",
+				);
+			}
+
+			const result = await pollGmailForTasks(
+				env.AI,
+				db,
+				accessToken,
+				userId,
+				calendarId,
+			);
+			return {
+				content: [
+					{
+						type: "text",
+						text: JSON.stringify(
+							{
+								created: result.created,
+								errors: result.errors,
+							},
+							null,
+							2,
+						),
+					},
+				],
+			};
+		}
+
+		case "check_calendar_availability": {
+			if (!env) return errorResult("Environment not available");
+			const gcalId = String(args.calendarId);
+			const timeMin = String(args.timeMin);
+			const timeMax = String(args.timeMax);
+
+			const accessToken = await getValidAccessToken(
+				db,
+				userId,
+				env.GOOGLE_CLIENT_ID,
+				env.GOOGLE_CLIENT_SECRET,
+			);
+			if (!accessToken) {
+				return errorResult(
+					"Could not obtain Google access token. Ensure Google OAuth is connected.",
+				);
+			}
+
+			const busySlots = await getFreeBusy(
+				accessToken,
+				gcalId,
+				timeMin,
+				timeMax,
+			);
+			return {
+				content: [
+					{
+						type: "text",
+						text: JSON.stringify(
+							{
+								calendarId: gcalId,
+								timeMin,
+								timeMax,
+								busySlots,
+								freeSlotCount:
+									busySlots.length === 0
+										? "Entire range is free"
+										: `${busySlots.length} busy slot(s)`,
+							},
+							null,
+							2,
+						),
+					},
+				],
 			};
 		}
 
