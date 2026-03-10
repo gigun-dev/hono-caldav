@@ -10,6 +10,7 @@ export function createAuth(env: CloudflareBindings) {
 		baseURL: env.BETTER_AUTH_URL,
 		basePath: "/api/auth",
 		secret: env.BETTER_AUTH_SECRET,
+		trustedOrigins: [env.BETTER_AUTH_URL],
 		socialProviders: {
 			google: {
 				clientId: env.GOOGLE_CLIENT_ID,

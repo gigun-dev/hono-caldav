@@ -52,7 +52,7 @@ export function generateVeventIcs(event: EventInfo): string {
 		lines.push(`LOCATION:${escapeIcsText(event.location)}`);
 	lines.push("END:VEVENT", "END:VCALENDAR");
 
-	return lines.join("\r\n") + "\r\n";
+	return foldIcsLines(lines.join("\r\n") + "\r\n");
 }
 
 /**
@@ -87,7 +87,7 @@ export function generateItipRequest(event: EventInfo): string {
 		lines.push(`LOCATION:${escapeIcsText(event.location)}`);
 	lines.push("END:VEVENT", "END:VCALENDAR");
 
-	return lines.join("\r\n") + "\r\n";
+	return foldIcsLines(lines.join("\r\n") + "\r\n");
 }
 
 /**
@@ -177,8 +177,42 @@ function formatTimestamp(date: Date): string {
 	return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 }
 
+/**
+ * Fold ICS content lines exceeding 75 octets per RFC 5545 §3.1.
+ */
+function foldIcsLines(ics: string): string {
+	return ics
+		.split("\r\n")
+		.map((line) => {
+			if (new TextEncoder().encode(line).length <= 75) return line;
+			const result: string[] = [];
+			let remaining = line;
+			let first = true;
+			while (new TextEncoder().encode(remaining).length > 75) {
+				// Find safe cut point at 75 bytes (first line) or 74 (continuation)
+				const limit = first ? 75 : 74;
+				let cut = limit;
+				// Ensure we don't split a multi-byte char
+				while (
+					cut > 0 &&
+					new TextEncoder().encode(remaining.slice(0, cut)).length > limit
+				) {
+					cut--;
+				}
+				result.push((first ? "" : " ") + remaining.slice(0, cut));
+				remaining = remaining.slice(cut);
+				first = false;
+			}
+			if (remaining) result.push((first ? "" : " ") + remaining);
+			return result.join("\r\n");
+		})
+		.join("\r\n");
+}
+
 function extractProp(ics: string, propName: string): string | null {
+	// Unfold lines first (RFC 5545 §3.1: CRLF + space/tab = continuation)
+	const unfolded = ics.replace(/\r?\n[ \t]/g, "");
 	const regex = new RegExp(`^${propName}[^:]*:(.+)$`, "im");
-	const match = ics.match(regex);
+	const match = unfolded.match(regex);
 	return match?.[1]?.trim() ?? null;
 }
