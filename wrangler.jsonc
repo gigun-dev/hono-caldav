@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "caldav",
-	"main": "src/index.ts",
+	"main": "src/index.tsx",
 	"compatibility_date": "2026-01-26",
 	"compatibility_flags": ["nodejs_compat"],
 	"d1_databases": [

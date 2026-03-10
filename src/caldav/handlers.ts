@@ -175,14 +175,14 @@ function normalizeUidParam(rawValue: string): string | null {
 	return uid || null;
 }
 
-function requireAuth(
+async function requireAuth(
 	c: Context<{ Bindings: CloudflareBindings }>,
-): CaldavUser | null {
+): Promise<CaldavUser | null> {
 	const auth = parseBasicAuth(c.req.header("authorization"));
 	if (!auth) {
 		return null;
 	}
-	return authenticateBasicUser(c.env, auth.username, auth.password);
+	return authenticateBasicUser(c.env, c.env.DB, auth.username, auth.password);
 }
 
 export function registerCaldavRoutes(
@@ -200,7 +200,7 @@ export function registerCaldavRoutes(
 	const handlePrincipal = async (
 		c: Context<{ Bindings: CloudflareBindings }>,
 	) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
@@ -210,7 +210,7 @@ export function registerCaldavRoutes(
 	};
 
 	const handleEntry = async (c: Context<{ Bindings: CloudflareBindings }>) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
@@ -222,7 +222,7 @@ export function registerCaldavRoutes(
 	const handleProjects = async (
 		c: Context<{ Bindings: CloudflareBindings }>,
 	) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
@@ -236,7 +236,7 @@ export function registerCaldavRoutes(
 	const handleProject = async (
 		c: Context<{ Bindings: CloudflareBindings }>,
 	) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
@@ -259,7 +259,7 @@ export function registerCaldavRoutes(
 	};
 
 	const handleReport = async (c: Context<{ Bindings: CloudflareBindings }>) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
@@ -373,7 +373,7 @@ export function registerCaldavRoutes(
 	const handleProjectPropPatch = async (
 		c: Context<{ Bindings: CloudflareBindings }>,
 	) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
@@ -435,7 +435,7 @@ export function registerCaldavRoutes(
 			order: number | null;
 		},
 	) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
@@ -509,7 +509,7 @@ export function registerCaldavRoutes(
 
 	// GET single object
 	app.get("/dav/projects/:projectId/:uid", async (c) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
@@ -537,7 +537,7 @@ export function registerCaldavRoutes(
 
 	// PROPFIND single object
 	app.on("PROPFIND", "/dav/projects/:projectId/:uid", async (c) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
@@ -564,7 +564,7 @@ export function registerCaldavRoutes(
 
 	// PUT (create or update) object
 	app.put("/dav/projects/:projectId/:uid", async (c) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
@@ -615,7 +615,7 @@ export function registerCaldavRoutes(
 
 	// DELETE object
 	app.delete("/dav/projects/:projectId/:uid", async (c) => {
-		const user = requireAuth(c);
+		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}

@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, it, expect, beforeAll } from "vitest";
-import "../src/index";
+import "../src/index.js";
 
 // --- Helpers ---
 

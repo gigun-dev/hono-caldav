@@ -19,6 +19,10 @@ export default defineWorkersProject(async () => {
 							// These are not real secrets — do not use in production.
 							CALDAV_USERNAME: "test-user",
 							CALDAV_PASSWORD: "test-pass",
+							BETTER_AUTH_URL: "http://localhost:8787",
+							BETTER_AUTH_SECRET: "test-secret-at-least-32-characters-long",
+							GOOGLE_CLIENT_ID: "test-client-id",
+							GOOGLE_CLIENT_SECRET: "test-client-secret",
 						},
 					},
 				},
