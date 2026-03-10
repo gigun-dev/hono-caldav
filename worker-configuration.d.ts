@@ -6,6 +6,7 @@ declare namespace Cloudflare {
 		mainModule: typeof import("./src/index");
 	}
 	interface Env {
+		AI: Ai;
 		DB: D1Database;
 		CALDAV_USERNAME: string;
 		CALDAV_PASSWORD: string;

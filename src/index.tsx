@@ -13,6 +13,7 @@ import { DashboardPage } from "./pages/dashboard.js";
 import { SetupPage } from "./pages/setup.js";
 import { generateMobileconfig } from "./setup/mobileconfig.js";
 import { handleMcpRequest } from "./mcp/handler.js";
+import { processNaturalLanguage } from "./ai/natural-language.js";
 import {
 	createScheduledEvent,
 	processReply,
@@ -154,6 +155,29 @@ app.post("/api/scheduling/counter", async (c) => {
 
 app.get("/api/scheduling/events/:uid/attendees", authGuard, async (c) => {
 	return getEventAttendees(c);
+});
+
+// --- Natural language task CRUD (Workers AI) ---
+app.post("/api/tasks/natural", authGuard, async (c) => {
+	const user = c.get("user");
+	const { calendarId, input } = await c.req.json<{
+		calendarId: number;
+		input: string;
+	}>();
+	if (!calendarId || !input) {
+		return c.json(
+			{ action: "error", message: "calendarId and input are required" },
+			400,
+		);
+	}
+	const result = await processNaturalLanguage(
+		c.env.AI,
+		c.env.DB,
+		user.id,
+		calendarId,
+		input,
+	);
+	return c.json(result);
 });
 
 // --- MCP endpoint (Streamable HTTP, JSON-RPC) ---
