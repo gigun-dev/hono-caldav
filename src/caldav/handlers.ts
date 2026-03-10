@@ -592,7 +592,7 @@ export function registerCaldavRoutes(
 			return c.text("Invalid UID", 400);
 		}
 
-		// If-Match check
+		// If-Match check: resource MUST exist and ETag must match
 		const ifMatch = c.req.header("if-match");
 		if (ifMatch) {
 			const existing = await getObjectByUid(c.env.DB, cal.id, uid);
@@ -600,7 +600,16 @@ export function registerCaldavRoutes(
 				if (!existing) {
 					return c.text("Precondition Failed", 412);
 				}
-			} else if (existing && existing.etag !== ifMatch) {
+			} else if (!existing || existing.etag !== ifMatch) {
+				return c.text("Precondition Failed", 412);
+			}
+		}
+
+		// If-None-Match: * — only create, never overwrite
+		const ifNoneMatch = c.req.header("if-none-match");
+		if (ifNoneMatch === "*") {
+			const existing = await getObjectByUid(c.env.DB, cal.id, uid);
+			if (existing) {
 				return c.text("Precondition Failed", 412);
 			}
 		}

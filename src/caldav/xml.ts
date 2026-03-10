@@ -134,6 +134,10 @@ function objectProps(
 	filter: PropFilter = "allprop",
 ): string {
 	let result = "";
+	if (shouldInclude(filter, "resourcetype")) {
+		result += `
+        <d:resourcetype/>`;
+	}
 	if (shouldInclude(filter, "getetag")) {
 		result += `
         <d:getetag>${xmlEscape(obj.etag)}</d:getetag>`;
