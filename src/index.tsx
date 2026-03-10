@@ -7,6 +7,7 @@ import {
 	revokeAppPassword,
 } from "./auth/app-password.js";
 import { registerCaldavRoutes } from "./caldav/handlers.js";
+import { getCalendarById } from "./caldav/storage.js";
 import { authGuard } from "./middleware/auth-guard.js";
 import { LoginPage } from "./pages/login.js";
 import { DashboardPage } from "./pages/dashboard.js";
@@ -172,6 +173,11 @@ app.post("/api/tasks/natural", authGuard, async (c) => {
 			{ action: "error", message: "calendarId and input are required" },
 			400,
 		);
+	}
+	// Verify calendar ownership
+	const cal = await getCalendarById(c.env.DB, user.id, calendarId);
+	if (!cal) {
+		return c.json({ action: "error", message: "Calendar not found" }, 404);
 	}
 	const result = await processNaturalLanguage(
 		c.env.AI,
