@@ -824,7 +824,152 @@ describe("ETag SHA-256", () => {
 	});
 });
 
-// === 14. PROPFIND property filtering ===
+// === 14. CalDAV edge cases ===
+
+describe("CalDAV edge cases", () => {
+	let calendarId: number;
+	beforeAll(async () => {
+		calendarId = await seedCalendar("Edge Case Calendar", "VTODO");
+	});
+
+	it("PUT with If-Match succeeds when ETag matches", async () => {
+		const ics1 = makeVtodo("ifmatch-1", "Original");
+		const putRes = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/ifmatch-1.ics`,
+			{
+				body: ics1,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		expect(putRes.status).toBe(201);
+		const etag = putRes.headers.get("ETag")!;
+
+		const ics2 = makeVtodo("ifmatch-1", "Updated via If-Match");
+		const updateRes = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/ifmatch-1.ics`,
+			{
+				body: ics2,
+				headers: {
+					"Content-Type": "text/calendar",
+					"If-Match": etag,
+				},
+			},
+		);
+		expect(updateRes.status).toBe(204);
+	});
+
+	it("PUT with If-Match fails when ETag does not match (412)", async () => {
+		const ics1 = makeVtodo("ifmatch-2", "Original");
+		await request(
+			"PUT",
+			`/dav/projects/${calendarId}/ifmatch-2.ics`,
+			{
+				body: ics1,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+
+		const ics2 = makeVtodo("ifmatch-2", "Bad update");
+		const updateRes = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/ifmatch-2.ics`,
+			{
+				body: ics2,
+				headers: {
+					"Content-Type": "text/calendar",
+					"If-Match": '"wrong-etag-value"',
+				},
+			},
+		);
+		expect(updateRes.status).toBe(412);
+	});
+
+	it("PUT with If-Match: * fails when object does not exist (412)", async () => {
+		const ics = makeVtodo("ifmatch-star-missing", "Does not exist yet");
+		const res = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/ifmatch-star-missing.ics`,
+			{
+				body: ics,
+				headers: {
+					"Content-Type": "text/calendar",
+					"If-Match": "*",
+				},
+			},
+		);
+		expect(res.status).toBe(412);
+	});
+
+	it("PROPFIND /dav/projects/ with Depth:1 lists calendars", async () => {
+		const res = await request("PROPFIND", "/dav/projects/", {
+			headers: { Depth: "1" },
+		});
+		expect(res.status).toBe(207);
+		const xml = await res.text();
+		expect(xml).toContain("Edge Case Calendar");
+		expect(xml).toContain(`/dav/projects/${calendarId}/`);
+	});
+
+	it("DELETE non-existent object returns 404", async () => {
+		const res = await request(
+			"DELETE",
+			`/dav/projects/${calendarId}/completely-nonexistent.ics`,
+		);
+		expect(res.status).toBe(404);
+	});
+
+	it("PUT empty body returns 400", async () => {
+		const res = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/empty-body.ics`,
+			{
+				body: "",
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it("OPTIONS on /dav/ returns DAV header with correct capabilities", async () => {
+		const res = await request("OPTIONS", "/dav/");
+		expect(res.status).toBe(204);
+		const dav = res.headers.get("DAV");
+		expect(dav).toContain("calendar-access");
+		expect(dav).toContain("sync-collection");
+		expect(dav).toContain("extended-mkcol");
+		const allow = res.headers.get("Allow");
+		expect(allow).toContain("PROPFIND");
+		expect(allow).toContain("REPORT");
+		expect(allow).toContain("PUT");
+		expect(allow).toContain("DELETE");
+		expect(allow).toContain("MKCOL");
+	});
+
+	it("DELETE with If-Match fails when ETag does not match (412)", async () => {
+		const ics = makeVtodo("del-ifmatch-1", "Conditional delete");
+		await request(
+			"PUT",
+			`/dav/projects/${calendarId}/del-ifmatch-1.ics`,
+			{
+				body: ics,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+
+		const res = await request(
+			"DELETE",
+			`/dav/projects/${calendarId}/del-ifmatch-1.ics`,
+			{
+				headers: { "If-Match": '"wrong-etag"' },
+			},
+		);
+		expect(res.status).toBe(412);
+	});
+});
+
+// === 15. PROPFIND property filtering ===
 
 describe("PROPFIND property filtering", () => {
 	let calendarId: number;

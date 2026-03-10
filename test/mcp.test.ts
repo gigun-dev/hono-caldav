@@ -71,6 +71,133 @@ describe("MCP Protocol", () => {
 	});
 });
 
+describe("MCP Cross-user isolation", () => {
+	let otherUserCalendarId: number;
+
+	beforeAll(async () => {
+		// Create a calendar owned by a different user
+		await env.DB.prepare(
+			"INSERT INTO calendars (user_id, name, component_type) VALUES (?, ?, ?)",
+		)
+			.bind("other-user-id", "Other User Calendar", "VTODO")
+			.run();
+		const row = await env.DB.prepare(
+			"SELECT id FROM calendars WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+		)
+			.bind("other-user-id")
+			.first<{ id: number }>();
+		otherUserCalendarId = row!.id;
+	});
+
+	it("returns error when accessing another user's calendarId", async () => {
+		const res = await mcpRequest("tools/call", {
+			name: "list_tasks",
+			arguments: { calendarId: otherUserCalendarId },
+		});
+		const body = await res.json();
+		expect(body.result.isError).toBe(true);
+		expect(body.result.content[0].text).toContain("Calendar not found");
+	});
+
+	it("returns error for update_task with non-existent calendar", async () => {
+		const res = await mcpRequest("tools/call", {
+			name: "update_task",
+			arguments: { calendarId: 999999, uid: "some-uid", summary: "Test" },
+		});
+		const body = await res.json();
+		expect(body.result.isError).toBe(true);
+		expect(body.result.content[0].text).toContain("Calendar not found");
+	});
+
+	it("returns error for create_task on another user's calendar", async () => {
+		const res = await mcpRequest("tools/call", {
+			name: "create_task",
+			arguments: { calendarId: otherUserCalendarId, summary: "Sneaky task" },
+		});
+		const body = await res.json();
+		expect(body.result.isError).toBe(true);
+	});
+
+	it("returns error for search_tasks on another user's calendar", async () => {
+		const res = await mcpRequest("tools/call", {
+			name: "search_tasks",
+			arguments: { calendarId: otherUserCalendarId, query: "test" },
+		});
+		const body = await res.json();
+		expect(body.result.isError).toBe(true);
+		expect(body.result.content[0].text).toContain("Calendar not found");
+	});
+});
+
+describe("MCP JSON-RPC spec compliance", () => {
+	it("handles request without jsonrpc field gracefully", async () => {
+		const res = await SELF.fetch("http://localhost/mcp", {
+			method: "POST",
+			headers: {
+				Authorization: MCP_AUTH,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ id: 1, method: "ping" }),
+		});
+		// Our implementation still processes this
+		const body = await res.json();
+		expect(body.result).toEqual({});
+	});
+
+	it("handles batch request with multiple methods", async () => {
+		const res = await SELF.fetch("http://localhost/mcp", {
+			method: "POST",
+			headers: {
+				Authorization: MCP_AUTH,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify([
+				{ jsonrpc: "2.0", id: 1, method: "ping" },
+				{ jsonrpc: "2.0", id: 2, method: "tools/list" },
+				{ jsonrpc: "2.0", id: 3, method: "unknown/method" },
+			]),
+		});
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(Array.isArray(body)).toBe(true);
+		expect(body).toHaveLength(3);
+
+		// ping
+		expect(body[0].id).toBe(1);
+		expect(body[0].result).toEqual({});
+
+		// tools/list
+		expect(body[1].id).toBe(2);
+		expect(body[1].result.tools).toBeDefined();
+
+		// unknown method
+		expect(body[2].id).toBe(3);
+		expect(body[2].error).toBeDefined();
+		expect(body[2].error.code).toBe(-32601);
+	});
+
+	it("returns parse error for invalid JSON body", async () => {
+		const res = await SELF.fetch("http://localhost/mcp", {
+			method: "POST",
+			headers: {
+				Authorization: MCP_AUTH,
+				"Content-Type": "application/json",
+			},
+			body: "not json at all",
+		});
+		const body = await res.json();
+		expect(body.error).toBeDefined();
+		expect(body.error.code).toBe(-32700);
+	});
+
+	it("returns error when tools/call has no tool name", async () => {
+		const res = await mcpRequest("tools/call", {});
+		const body = await res.json();
+		expect(body.error).toBeDefined();
+		expect(body.error.code).toBe(-32602);
+	});
+});
+
 describe("MCP Tools", () => {
 	let calendarId: number;
 
