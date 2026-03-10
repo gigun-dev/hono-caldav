@@ -454,6 +454,80 @@ describe("REPORT sync-collection", () => {
 	});
 });
 
+// === 6b. Sync-collection: full lifecycle (add, update, delete) ===
+
+describe("REPORT sync-collection lifecycle", () => {
+	let calendarId: number;
+	beforeAll(async () => {
+		calendarId = await seedCalendar("Sync Lifecycle", "VTODO");
+	});
+
+	it("tracks add, update, and delete operations correctly", async () => {
+		// Get initial sync token
+		const syncBody = (token: string) => `<?xml version="1.0" encoding="UTF-8"?>
+<d:sync-collection xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:sync-token>${token}</d:sync-token>
+  <d:prop><d:getetag/><c:calendar-data/></d:prop>
+</d:sync-collection>`;
+
+		const res0 = await request("REPORT", `/dav/projects/${calendarId}/`, {
+			body: syncBody(""),
+		});
+		const xml0 = await res0.text();
+		const token0 = xml0.match(/<d:sync-token>(\d+)<\/d:sync-token>/)![1];
+
+		// 1. Create an object
+		const ics1 = makeVtodo("sync-lifecycle-1", "Created");
+		await request("PUT", `/dav/projects/${calendarId}/sync-lifecycle-1.ics`, {
+			body: ics1,
+			headers: { "Content-Type": "text/calendar" },
+		});
+
+		// Sync after create — should see the addition
+		const res1 = await request("REPORT", `/dav/projects/${calendarId}/`, {
+			body: syncBody(token0),
+		});
+		expect(res1.status).toBe(207);
+		const xml1 = await res1.text();
+		expect(xml1).toContain("sync-lifecycle-1");
+		expect(xml1).toContain("200 OK");
+		const token1 = xml1.match(/<d:sync-token>(\d+)<\/d:sync-token>/)![1];
+		expect(Number(token1)).toBeGreaterThan(Number(token0));
+
+		// 2. Update the object
+		const ics2 = makeVtodo("sync-lifecycle-1", "Updated");
+		await request("PUT", `/dav/projects/${calendarId}/sync-lifecycle-1.ics`, {
+			body: ics2,
+			headers: { "Content-Type": "text/calendar" },
+		});
+
+		// Sync after update — should see the modification
+		const res2 = await request("REPORT", `/dav/projects/${calendarId}/`, {
+			body: syncBody(token1),
+		});
+		expect(res2.status).toBe(207);
+		const xml2 = await res2.text();
+		expect(xml2).toContain("sync-lifecycle-1");
+		expect(xml2).toContain("Updated");
+		const token2 = xml2.match(/<d:sync-token>(\d+)<\/d:sync-token>/)![1];
+		expect(Number(token2)).toBeGreaterThan(Number(token1));
+
+		// 3. Delete the object
+		await request("DELETE", `/dav/projects/${calendarId}/sync-lifecycle-1.ics`);
+
+		// Sync after delete — should see 410 Gone
+		const res3 = await request("REPORT", `/dav/projects/${calendarId}/`, {
+			body: syncBody(token2),
+		});
+		expect(res3.status).toBe(207);
+		const xml3 = await res3.text();
+		expect(xml3).toContain("sync-lifecycle-1");
+		expect(xml3).toContain("410 Gone");
+		const token3 = xml3.match(/<d:sync-token>(\d+)<\/d:sync-token>/)![1];
+		expect(Number(token3)).toBeGreaterThan(Number(token2));
+	});
+});
+
 // === 7. REPORT calendar-multiget ===
 
 describe("REPORT calendar-multiget", () => {
@@ -963,6 +1037,49 @@ describe("CalDAV edge cases", () => {
 			`/dav/projects/${calendarId}/del-ifmatch-1.ics`,
 			{
 				headers: { "If-Match": '"wrong-etag"' },
+			},
+		);
+		expect(res.status).toBe(412);
+	});
+
+	it("PUT with If-None-Match: * on a new resource succeeds (201)", async () => {
+		const ics = makeVtodo("ifnonematch-new", "Brand new task");
+		const res = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/ifnonematch-new.ics`,
+			{
+				body: ics,
+				headers: {
+					"Content-Type": "text/calendar",
+					"If-None-Match": "*",
+				},
+			},
+		);
+		expect(res.status).toBe(201);
+		expect(res.headers.get("ETag")).toBeTruthy();
+	});
+
+	it("PUT with If-None-Match: * on existing resource returns 412", async () => {
+		const ics1 = makeVtodo("ifnonematch-exist", "Already here");
+		await request(
+			"PUT",
+			`/dav/projects/${calendarId}/ifnonematch-exist.ics`,
+			{
+				body: ics1,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+
+		const ics2 = makeVtodo("ifnonematch-exist", "Try overwrite");
+		const res = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/ifnonematch-exist.ics`,
+			{
+				body: ics2,
+				headers: {
+					"Content-Type": "text/calendar",
+					"If-None-Match": "*",
+				},
 			},
 		);
 		expect(res.status).toBe(412);

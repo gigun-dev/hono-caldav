@@ -108,6 +108,98 @@ describe("iTIP parsing", () => {
 	});
 });
 
+// --- ICS line folding tests ---
+
+describe("ICS line folding", () => {
+	it("folds long SUMMARY lines at 75 octets", () => {
+		const longSummary =
+			"This is a very long event summary that exceeds seventy-five characters to test RFC 5545 line folding";
+		const ics = generateVeventIcs({
+			uid: "fold-test-1",
+			summary: longSummary,
+			dtstart: "20260315T100000Z",
+			dtend: "20260315T110000Z",
+			organizerEmail: "scheduling@test.com",
+			attendees: [],
+		});
+
+		// Every physical line (split by CRLF) must be <= 75 octets
+		const lines = ics.split("\r\n");
+		for (const line of lines) {
+			const octets = new TextEncoder().encode(line).length;
+			expect(octets).toBeLessThanOrEqual(75);
+		}
+
+		// The content should still contain the full summary when unfolded
+		const unfolded = ics.replace(/\r\n[ \t]/g, "");
+		expect(unfolded).toContain(longSummary);
+	});
+
+	it("does not fold short lines", () => {
+		const ics = generateVeventIcs({
+			uid: "fold-test-2",
+			summary: "Short",
+			dtstart: "20260315T100000Z",
+			dtend: "20260315T110000Z",
+			organizerEmail: "a@b.com",
+			attendees: [],
+		});
+
+		// No continuation lines (lines starting with space) for short content
+		const lines = ics.split("\r\n");
+		const summaryLine = lines.find((l) => l.startsWith("SUMMARY:"));
+		expect(summaryLine).toBe("SUMMARY:Short");
+	});
+
+	it("folds long ATTENDEE lines with parameters", () => {
+		const ics = generateVeventIcs({
+			uid: "fold-test-3",
+			summary: "Folding attendees",
+			dtstart: "20260315T100000Z",
+			dtend: "20260315T110000Z",
+			organizerEmail: "scheduling@test.com",
+			attendees: [
+				{
+					email: "a-very-long-email-address-for-testing@extremely-long-domain-name.example.com",
+					partstat: "NEEDS-ACTION",
+					rsvp: true,
+				},
+			],
+		});
+
+		const lines = ics.split("\r\n");
+		for (const line of lines) {
+			const octets = new TextEncoder().encode(line).length;
+			expect(octets).toBeLessThanOrEqual(75);
+		}
+
+		// Unfolded should contain the full attendee
+		const unfolded = ics.replace(/\r\n[ \t]/g, "");
+		expect(unfolded).toContain(
+			"mailto:a-very-long-email-address-for-testing@extremely-long-domain-name.example.com",
+		);
+	});
+
+	it("handles empty lines and very short lines correctly", () => {
+		// generateVeventIcs always produces non-empty lines, but foldIcsLines
+		// should handle edge cases. We test via the output structure.
+		const ics = generateVeventIcs({
+			uid: "x",
+			summary: "A",
+			dtstart: "20260315T100000Z",
+			dtend: "20260315T110000Z",
+			organizerEmail: "a@b.com",
+			attendees: [],
+		});
+
+		// Should still be valid ICS
+		expect(ics).toContain("BEGIN:VCALENDAR");
+		expect(ics).toContain("END:VCALENDAR");
+		expect(ics).toContain("BEGIN:VEVENT");
+		expect(ics).toContain("END:VEVENT");
+	});
+});
+
 // --- Attendee storage tests ---
 
 describe("Attendee storage", () => {
