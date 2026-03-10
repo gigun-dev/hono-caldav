@@ -298,11 +298,10 @@ async function callTool(
 		}
 
 		case "get_task": {
-			const obj = await getObjectByUid(
-				db,
-				Number(args.calendarId),
-				String(args.uid),
-			);
+			const calendarId = Number(args.calendarId);
+			const cal = await getCalendarById(db, userId, calendarId);
+			if (!cal) return errorResult("Calendar not found");
+			const obj = await getObjectByUid(db, calendarId, String(args.uid));
 			if (!obj) return errorResult("Task not found");
 			return {
 				content: [
@@ -350,6 +349,8 @@ async function callTool(
 
 		case "update_task": {
 			const calendarId = Number(args.calendarId);
+			const cal = await getCalendarById(db, userId, calendarId);
+			if (!cal) return errorResult("Calendar not found");
 			const uid = String(args.uid);
 			const obj = await getObjectByUid(db, calendarId, uid);
 			if (!obj) return errorResult("Task not found");
@@ -381,6 +382,8 @@ async function callTool(
 
 		case "complete_task": {
 			const calendarId = Number(args.calendarId);
+			const cal = await getCalendarById(db, userId, calendarId);
+			if (!cal) return errorResult("Calendar not found");
 			const uid = String(args.uid);
 			const obj = await getObjectByUid(db, calendarId, uid);
 			if (!obj) return errorResult("Task not found");
@@ -397,11 +400,10 @@ async function callTool(
 		}
 
 		case "delete_task": {
-			const deleted = await deleteObject(
-				db,
-				Number(args.calendarId),
-				String(args.uid),
-			);
+			const calendarId = Number(args.calendarId);
+			const cal = await getCalendarById(db, userId, calendarId);
+			if (!cal) return errorResult("Calendar not found");
+			const deleted = await deleteObject(db, calendarId, String(args.uid));
 			return {
 				content: [
 					{
@@ -415,6 +417,8 @@ async function callTool(
 
 		case "search_tasks": {
 			const calendarId = Number(args.calendarId);
+			const cal = await getCalendarById(db, userId, calendarId);
+			if (!cal) return errorResult("Calendar not found");
 			const query = String(args.query).toLowerCase();
 			const status = args.status ? String(args.status) : undefined;
 			const objects = await getObjectsForCalendar(db, calendarId);

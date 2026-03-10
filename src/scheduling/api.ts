@@ -232,6 +232,10 @@ export async function processCounter(
 		);
 	}
 
+	// Update DTSTAMP
+	const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+	updatedIcs = updatedIcs.replace(/DTSTAMP[^:]*:.+/i, `DTSTAMP:${now}`);
+
 	await putObject(c.env.DB, obj.calendarId, counter.uid, updatedIcs);
 
 	// Get attendees to notify
@@ -271,6 +275,14 @@ export async function processCounter(
 			newRequest,
 			attendees.map((a) => a.email),
 		);
+	}
+
+	// Update PARTSTAT in DB: counter proposer → ACCEPTED, others → NEEDS-ACTION
+	await updatePartstat(c.env.DB, obj.id, counter.attendeeEmail, "ACCEPTED");
+	for (const a of attendees) {
+		if (a.email !== counter.attendeeEmail) {
+			await updatePartstat(c.env.DB, obj.id, a.email, "NEEDS-ACTION");
+		}
 	}
 
 	// Store COUNTER feedback

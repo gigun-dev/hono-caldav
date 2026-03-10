@@ -21,7 +21,7 @@ export async function addAttendees(
 	for (const att of attendees) {
 		await db
 			.prepare(
-				"INSERT INTO attendees (calendar_object_id, email, partstat, rsvp) VALUES (?, ?, ?, ?)",
+				"INSERT OR IGNORE INTO attendees (calendar_object_id, email, partstat, rsvp) VALUES (?, ?, ?, ?)",
 			)
 			.bind(
 				calendarObjectId,

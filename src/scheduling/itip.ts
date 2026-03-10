@@ -35,7 +35,7 @@ export function generateVeventIcs(event: EventInfo): string {
 		`DTSTAMP:${now}`,
 		`DTSTART:${event.dtstart}`,
 		`DTEND:${event.dtend}`,
-		`SUMMARY:${event.summary}`,
+		`SUMMARY:${escapeIcsText(event.summary)}`,
 		`ORGANIZER;CN=Scheduling:mailto:${event.organizerEmail}`,
 		`SEQUENCE:${event.sequence ?? 0}`,
 	];
@@ -46,8 +46,10 @@ export function generateVeventIcs(event: EventInfo): string {
 		);
 	}
 
-	if (event.description) lines.push(`DESCRIPTION:${event.description}`);
-	if (event.location) lines.push(`LOCATION:${event.location}`);
+	if (event.description)
+		lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+	if (event.location)
+		lines.push(`LOCATION:${escapeIcsText(event.location)}`);
 	lines.push("END:VEVENT", "END:VCALENDAR");
 
 	return lines.join("\r\n") + "\r\n";
@@ -68,7 +70,7 @@ export function generateItipRequest(event: EventInfo): string {
 		`DTSTAMP:${now}`,
 		`DTSTART:${event.dtstart}`,
 		`DTEND:${event.dtend}`,
-		`SUMMARY:${event.summary}`,
+		`SUMMARY:${escapeIcsText(event.summary)}`,
 		`ORGANIZER;CN=Scheduling:mailto:${event.organizerEmail}`,
 		`SEQUENCE:${event.sequence ?? 0}`,
 	];
@@ -79,8 +81,10 @@ export function generateItipRequest(event: EventInfo): string {
 		);
 	}
 
-	if (event.description) lines.push(`DESCRIPTION:${event.description}`);
-	if (event.location) lines.push(`LOCATION:${event.location}`);
+	if (event.description)
+		lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+	if (event.location)
+		lines.push(`LOCATION:${escapeIcsText(event.location)}`);
 	lines.push("END:VEVENT", "END:VCALENDAR");
 
 	return lines.join("\r\n") + "\r\n";
@@ -157,6 +161,17 @@ export function parseItipCounter(icsData: string): {
 }
 
 // --- Helpers ---
+
+/**
+ * Escape text values for ICS properties (RFC 5545 §3.3.11).
+ */
+function escapeIcsText(s: string): string {
+	return s
+		.replace(/\\/g, "\\\\")
+		.replace(/;/g, "\\;")
+		.replace(/,/g, "\\,")
+		.replace(/\r?\n/g, "\\n");
+}
 
 function formatTimestamp(date: Date): string {
 	return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
