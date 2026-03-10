@@ -16,6 +16,7 @@
 		"better-auth": "^1.5.4",
 		"hono": "^4.11.5",
 		"ical.js": "^2.2.1",
+		"postal-mime": "^2.7.3",
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {

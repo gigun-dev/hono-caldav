@@ -19,6 +19,19 @@ import {
 	processCounter,
 	getEventAttendees,
 } from "./scheduling/api.js";
+import { handleEmail } from "./scheduling/email-worker.js";
+
+function timingSafeEqualStr(a: string, b: string): boolean {
+	const encoder = new TextEncoder();
+	const aBuf = encoder.encode(a);
+	const bBuf = encoder.encode(b);
+	if (aBuf.length !== bBuf.length) return false;
+	let result = 0;
+	for (let i = 0; i < aBuf.length; i++) {
+		result |= aBuf[i]! ^ bBuf[i]!;
+	}
+	return result === 0;
+}
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -118,12 +131,24 @@ app.post("/api/scheduling/events", authGuard, async (c) => {
 });
 
 app.post("/api/scheduling/reply", async (c) => {
-	// Reply endpoint is called by email workers, no session auth
-	// In production, authenticate via a shared secret or webhook token
+	const secret = c.env.SCHEDULING_WEBHOOK_SECRET;
+	if (secret) {
+		const provided = c.req.header("X-Webhook-Secret") ?? "";
+		if (!timingSafeEqualStr(provided, secret)) {
+			return c.text("Unauthorized", 401);
+		}
+	}
 	return processReply(c);
 });
 
 app.post("/api/scheduling/counter", async (c) => {
+	const secret = c.env.SCHEDULING_WEBHOOK_SECRET;
+	if (secret) {
+		const provided = c.req.header("X-Webhook-Secret") ?? "";
+		if (!timingSafeEqualStr(provided, secret)) {
+			return c.text("Unauthorized", 401);
+		}
+	}
 	return processCounter(c);
 });
 
@@ -134,7 +159,10 @@ app.get("/api/scheduling/events/:uid/attendees", authGuard, async (c) => {
 // --- MCP endpoint (Streamable HTTP, JSON-RPC) ---
 app.all("/mcp", async (c) => {
 	const auth = c.req.header("Authorization");
-	if (!auth?.startsWith("Bearer ") || auth.slice(7) !== c.env.MCP_TOKEN) {
+	if (
+		!auth?.startsWith("Bearer ") ||
+		!timingSafeEqualStr(auth.slice(7), c.env.MCP_TOKEN)
+	) {
 		return c.text("Unauthorized", 401);
 	}
 	const userId = c.env.MCP_USER_ID || "default";
@@ -144,4 +172,9 @@ app.all("/mcp", async (c) => {
 // --- CalDAV routes ---
 registerCaldavRoutes(app);
 
-export default app;
+export default {
+	fetch: app.fetch,
+	async email(message: ForwardableEmailMessage, env: CloudflareBindings) {
+		await handleEmail(message, env);
+	},
+} satisfies ExportedHandler<CloudflareBindings>;

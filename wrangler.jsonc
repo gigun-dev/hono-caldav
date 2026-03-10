@@ -15,4 +15,11 @@
 		"enabled": true,
 		"head_sampling_rate": 1,
 	},
+	// Email Worker setup for iMIP receive:
+	// 1. Enable Email Routing in Cloudflare Dashboard for your domain
+	// 2. Add a custom address (e.g., scheduling@yourdomain.com) → route to this Worker
+	// 3. The `email` handler in src/index.tsx will process incoming iMIP emails
+	// 4. RESEND_API_KEY and SCHEDULING_EMAIL should be set as secrets:
+	//    wrangler secret put RESEND_API_KEY
+	//    wrangler secret put SCHEDULING_EMAIL
 }

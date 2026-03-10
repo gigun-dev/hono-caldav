@@ -89,6 +89,14 @@ export function generateItipRequest(event: EventInfo): string {
 /**
  * Parse an iTIP REPLY to extract PARTSTAT update.
  */
+const VALID_PARTSTATS = new Set([
+	"ACCEPTED",
+	"DECLINED",
+	"TENTATIVE",
+	"NEEDS-ACTION",
+	"DELEGATED",
+]);
+
 export function parseItipReply(icsData: string): {
 	uid: string;
 	attendeeEmail: string;
@@ -107,10 +115,13 @@ export function parseItipReply(icsData: string): {
 	);
 	if (!attendeeMatch) return null;
 
+	const partstat = attendeeMatch[1].trim();
+	if (!VALID_PARTSTATS.has(partstat)) return null;
+
 	return {
 		uid,
 		attendeeEmail: attendeeMatch[2].trim().toLowerCase(),
-		partstat: attendeeMatch[1].trim(),
+		partstat,
 		method: method.trim(),
 	};
 }

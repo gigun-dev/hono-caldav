@@ -25,6 +25,8 @@ export default defineWorkersProject(async () => {
 							GOOGLE_CLIENT_SECRET: "test-client-secret",
 							MCP_TOKEN: "test-mcp-token",
 							MCP_USER_ID: "default",
+							RESEND_API_KEY: "",
+							SCHEDULING_EMAIL: "scheduling@test.com",
 						},
 					},
 				},

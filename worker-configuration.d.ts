@@ -15,6 +15,9 @@ declare namespace Cloudflare {
 		GOOGLE_CLIENT_SECRET: string;
 		MCP_TOKEN: string;
 		MCP_USER_ID: string;
+		RESEND_API_KEY: string;
+		SCHEDULING_EMAIL: string;
+		SCHEDULING_WEBHOOK_SECRET: string;
 	}
 }
 interface CloudflareBindings extends Cloudflare.Env {}

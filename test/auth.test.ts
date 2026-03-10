@@ -17,7 +17,7 @@ describe("App Password generation", () => {
 		const { plain, hash, prefix } = await generateAppPassword();
 		expect(plain.length).toBeLessThanOrEqual(32);
 		expect(plain.length).toBeGreaterThanOrEqual(20);
-		expect(hash).toMatch(/^[0-9a-f]{64}$/);
+		expect(hash).toMatch(/^[0-9a-f]{32}:[0-9a-f]{64}$/);
 		expect(prefix).toBe(plain.slice(0, 8));
 	});
 

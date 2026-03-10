@@ -11,7 +11,9 @@ import {
 	getAttendees,
 	updatePartstat,
 	findObjectByUidGlobal,
+	addFeedback,
 } from "./storage.js";
+import { sendItipRequestToAttendees } from "./email-sender.js";
 import {
 	generateVeventIcs,
 	generateItipRequest,
@@ -80,11 +82,26 @@ export async function createScheduledEvent(
 	// Generate iTIP REQUEST for each attendee
 	const itipRequest = generateItipRequest(eventInfo);
 
+	// Send iMIP REQUEST emails via Resend if API key is configured
+	let emailResults: { success: boolean; error?: string }[] = [];
+	const resendApiKey = (c.env as unknown as Record<string, string>)
+		.RESEND_API_KEY;
+	if (resendApiKey) {
+		emailResults = await sendItipRequestToAttendees(
+			resendApiKey,
+			organizerEmail,
+			body.summary,
+			itipRequest,
+			body.attendees,
+		);
+	}
+
 	return c.json({
 		uid,
 		objectId: object.id,
 		attendees: attendeeInfos.map((a) => a.email),
-		itipRequest, // Client can use this to send via Resend or other email service
+		itipRequest, // Raw ICS for reference
+		emailsSent: emailResults,
 	});
 }
 
@@ -101,6 +118,17 @@ export async function processReply(
 	const reply = parseItipReply(icsData);
 	if (!reply || reply.method !== "REPLY") {
 		return c.json({ error: "Invalid iTIP REPLY" }, 400);
+	}
+
+	const VALID_PARTSTATS = new Set([
+		"ACCEPTED",
+		"DECLINED",
+		"TENTATIVE",
+		"NEEDS-ACTION",
+		"DELEGATED",
+	]);
+	if (!VALID_PARTSTATS.has(reply.partstat)) {
+		return c.json({ error: "Invalid PARTSTAT value" }, 400);
 	}
 
 	// Find the event by UID
@@ -132,6 +160,22 @@ export async function processReply(
 		`$1${reply.partstat}$2`,
 	);
 	await putObject(c.env.DB, obj.calendarId, reply.uid, updatedIcs);
+
+	// Track DECLINED feedback for analytics
+	if (reply.partstat === "DECLINED") {
+		const dtstartMatch = obj.icsData.match(/DTSTART[^:]*:(.+)/i);
+		const dtendMatch = obj.icsData.match(/DTEND[^:]*:(.+)/i);
+
+		await addFeedback(c.env.DB, {
+			calendarObjectId: obj.id,
+			attendeeEmail: reply.attendeeEmail,
+			feedbackType: "DECLINED",
+			originalDtstart: dtstartMatch?.[1]?.trim() ?? null,
+			originalDtend: dtendMatch?.[1]?.trim() ?? null,
+			proposedDtstart: null,
+			proposedDtend: null,
+		});
+	}
 
 	return c.json({
 		uid: reply.uid,
@@ -215,6 +259,31 @@ export async function processCounter(
 
 	const newRequest = generateItipRequest(eventInfo);
 
+	// Send updated REQUEST to all attendees via Resend
+	let emailResults: { success: boolean; error?: string }[] = [];
+	const resendApiKey = (c.env as unknown as Record<string, string>)
+		.RESEND_API_KEY;
+	if (resendApiKey && attendees.length > 0) {
+		emailResults = await sendItipRequestToAttendees(
+			resendApiKey,
+			organizerEmail,
+			summary,
+			newRequest,
+			attendees.map((a) => a.email),
+		);
+	}
+
+	// Store COUNTER feedback
+	await addFeedback(c.env.DB, {
+		calendarObjectId: obj.id,
+		attendeeEmail: counter.attendeeEmail,
+		feedbackType: "COUNTER",
+		originalDtstart: null,
+		originalDtend: null,
+		proposedDtstart: counter.newDtstart,
+		proposedDtend: counter.newDtend,
+	});
+
 	return c.json({
 		uid: counter.uid,
 		counterFrom: counter.attendeeEmail,
@@ -223,6 +292,7 @@ export async function processCounter(
 		sequence: currentSeq + 1,
 		itipRequest: newRequest,
 		attendeesToNotify: attendees.map((a) => a.email),
+		emailsSent: emailResults,
 	});
 }
 

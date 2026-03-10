@@ -97,6 +97,36 @@ export async function findObjectByUidGlobal(
 	return { id: row.id, calendarId: row.calendar_id, icsData: row.ics_data };
 }
 
+export type FeedbackInput = {
+	calendarObjectId: number;
+	attendeeEmail: string;
+	feedbackType: string;
+	originalDtstart: string | null;
+	originalDtend: string | null;
+	proposedDtstart: string | null;
+	proposedDtend: string | null;
+};
+
+export async function addFeedback(
+	db: D1Database,
+	feedback: FeedbackInput,
+): Promise<void> {
+	await db
+		.prepare(
+			"INSERT INTO scheduling_feedback (calendar_object_id, attendee_email, feedback_type, original_dtstart, original_dtend, proposed_dtstart, proposed_dtend) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		)
+		.bind(
+			feedback.calendarObjectId,
+			feedback.attendeeEmail.toLowerCase(),
+			feedback.feedbackType,
+			feedback.originalDtstart,
+			feedback.originalDtend,
+			feedback.proposedDtstart,
+			feedback.proposedDtend,
+		)
+		.run();
+}
+
 function rowToAttendee(row: Record<string, unknown>): Attendee {
 	return {
 		id: row.id as number,
