@@ -10,6 +10,8 @@ import { registerCaldavRoutes } from "./caldav/handlers.js";
 import { authGuard } from "./middleware/auth-guard.js";
 import { LoginPage } from "./pages/login.js";
 import { DashboardPage } from "./pages/dashboard.js";
+import { SetupPage } from "./pages/setup.js";
+import { generateMobileconfig } from "./setup/mobileconfig.js";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -81,6 +83,25 @@ app.post("/api/app-passwords/:id/revoke", authGuard, async (c) => {
 	const user = c.get("user");
 	await revokeAppPassword(c.env.DB, user.id, c.req.param("id"));
 	return c.redirect("/dashboard");
+});
+
+// --- Setup pages (auth-protected) ---
+app.get("/setup", authGuard, (c) => {
+	const user = c.get("user");
+	const hostname = new URL(c.req.url).hostname;
+	return c.html(
+		<SetupPage hostname={hostname} userEmail={user.email} />,
+	);
+});
+
+app.get("/setup/ios", authGuard, (c) => {
+	const user = c.get("user");
+	const hostname = new URL(c.req.url).hostname;
+	const xml = generateMobileconfig(hostname, user.email);
+	return c.body(xml, 200, {
+		"Content-Type": "application/x-apple-aspen-config",
+		"Content-Disposition": 'attachment; filename="caldav.mobileconfig"',
+	});
 });
 
 // --- CalDAV routes ---

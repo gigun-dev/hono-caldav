@@ -251,7 +251,7 @@ describe("PUT", () => {
 				headers: { "Content-Type": "text/calendar" },
 			},
 		);
-		expect(res2.status).toBe(200);
+		expect(res2.status).toBe(204);
 	});
 
 	it("rejects invalid ICS data with 400", async () => {

@@ -5,7 +5,7 @@ import type { Calendar, CalendarObject } from "./storage.js";
 
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 const DAV_HEADERS = {
-	DAV: "1, calendar-access",
+	DAV: "1, calendar-access, sync-collection, extended-mkcol",
 };
 
 export type PropFilter = Set<string> | "allprop";
@@ -243,6 +243,12 @@ export function buildPrincipalResponse(
         <d:current-user-principal>
           <d:href>${href(`/dav/principals/${user.username}`)}</d:href>
         </d:current-user-principal>`;
+	}
+	if (shouldInclude(filter, "calendar-user-address-set")) {
+		extra += `
+        <c:calendar-user-address-set>
+          <d:href>mailto:${xmlEscape(user.username)}</d:href>
+        </c:calendar-user-address-set>`;
 	}
 	const props = collectionProps(
 		user.displayName ?? user.username,

@@ -607,9 +607,14 @@ export function registerCaldavRoutes(
 
 		const { object, created } = await putObject(c.env.DB, cal.id, uid, icsData);
 
-		return c.text(object.icsData, created ? 201 : 200, {
+		if (created) {
+			return c.text(object.icsData, 201, {
+				ETag: object.etag,
+				"Content-Type": "text/calendar; charset=utf-8",
+			});
+		}
+		return c.body(null, 204, {
 			ETag: object.etag,
-			"Content-Type": "text/calendar; charset=utf-8",
 		});
 	});
 
