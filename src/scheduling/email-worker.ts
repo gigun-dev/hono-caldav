@@ -102,14 +102,11 @@ async function handleReply(
 		return;
 	}
 
-	// Update PARTSTAT in stored ICS
-	const attendeeRegex = new RegExp(
-		`(ATTENDEE[^:]*PARTSTAT=)[^;:\\r\\n]+([^:]*:mailto:${escapeRegex(reply.attendeeEmail)})`,
-		"i",
-	);
-	const updatedIcs = obj.icsData.replace(
-		attendeeRegex,
-		`$1${reply.partstat}$2`,
+	// Update PARTSTAT in stored ICS using line-based parsing
+	const updatedIcs = updateAttendeePartstat(
+		obj.icsData,
+		reply.attendeeEmail,
+		reply.partstat,
 	);
 	await putObject(db, obj.calendarId, reply.uid, updatedIcs);
 
@@ -250,6 +247,33 @@ async function handleCounter(
 	);
 }
 
-function escapeRegex(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function updateAttendeePartstat(
+	icsData: string,
+	email: string,
+	newPartstat: string,
+): string {
+	const emailLower = email.toLowerCase();
+	const lines = icsData.split(/\r?\n/);
+	const result: string[] = [];
+
+	for (const line of lines) {
+		if (
+			line.toUpperCase().startsWith("ATTENDEE") &&
+			line.toLowerCase().includes(`mailto:${emailLower}`)
+		) {
+			if (/PARTSTAT=/i.test(line)) {
+				result.push(
+					line.replace(/PARTSTAT=[^;:\r\n]+/i, `PARTSTAT=${newPartstat}`),
+				);
+			} else {
+				result.push(
+					line.replace(/(:mailto:)/i, `;PARTSTAT=${newPartstat}$1`),
+				);
+			}
+		} else {
+			result.push(line);
+		}
+	}
+
+	return result.join("\r\n");
 }

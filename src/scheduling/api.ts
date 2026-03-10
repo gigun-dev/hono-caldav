@@ -149,15 +149,11 @@ export async function processReply(
 		return c.json({ error: "Attendee not found" }, 404);
 	}
 
-	// Update PARTSTAT in the stored ICS data
-	let updatedIcs = obj.icsData;
-	const attendeeRegex = new RegExp(
-		`(ATTENDEE[^:]*PARTSTAT=)[^;:\\r\\n]+([^:]*:mailto:${escapeRegex(reply.attendeeEmail)})`,
-		"i",
-	);
-	updatedIcs = updatedIcs.replace(
-		attendeeRegex,
-		`$1${reply.partstat}$2`,
+	// Update PARTSTAT in the stored ICS data using line-based parsing
+	let updatedIcs = updateAttendeePartstat(
+		obj.icsData,
+		reply.attendeeEmail,
+		reply.partstat,
 	);
 	await putObject(c.env.DB, obj.calendarId, reply.uid, updatedIcs);
 
@@ -333,6 +329,42 @@ export async function getEventAttendees(
 	});
 }
 
-function escapeRegex(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Update ATTENDEE PARTSTAT in ICS data using line-based parsing.
+ * Avoids regex catastrophic backtracking on malformed ATTENDEE lines.
+ */
+function updateAttendeePartstat(
+	icsData: string,
+	email: string,
+	newPartstat: string,
+): string {
+	const emailLower = email.toLowerCase();
+	const lines = icsData.split(/\r?\n/);
+	const result: string[] = [];
+
+	for (const line of lines) {
+		if (
+			line.toUpperCase().startsWith("ATTENDEE") &&
+			line.toLowerCase().includes(`mailto:${emailLower}`)
+		) {
+			// Replace or insert PARTSTAT on this ATTENDEE line
+			if (/PARTSTAT=/i.test(line)) {
+				result.push(
+					line.replace(/PARTSTAT=[^;:\r\n]+/i, `PARTSTAT=${newPartstat}`),
+				);
+			} else {
+				// Insert PARTSTAT before :mailto:
+				result.push(
+					line.replace(
+						/(:mailto:)/i,
+						`;PARTSTAT=${newPartstat}$1`,
+					),
+				);
+			}
+		} else {
+			result.push(line);
+		}
+	}
+
+	return result.join("\r\n");
 }
