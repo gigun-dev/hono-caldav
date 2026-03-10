@@ -23,6 +23,8 @@ export default defineWorkersProject(async () => {
 							BETTER_AUTH_SECRET: "test-secret-at-least-32-characters-long",
 							GOOGLE_CLIENT_ID: "test-client-id",
 							GOOGLE_CLIENT_SECRET: "test-client-secret",
+							MCP_TOKEN: "test-mcp-token",
+							MCP_USER_ID: "default",
 						},
 					},
 				},

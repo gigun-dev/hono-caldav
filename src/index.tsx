@@ -12,6 +12,7 @@ import { LoginPage } from "./pages/login.js";
 import { DashboardPage } from "./pages/dashboard.js";
 import { SetupPage } from "./pages/setup.js";
 import { generateMobileconfig } from "./setup/mobileconfig.js";
+import { handleMcpRequest } from "./mcp/handler.js";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -102,6 +103,16 @@ app.get("/setup/ios", authGuard, (c) => {
 		"Content-Type": "application/x-apple-aspen-config",
 		"Content-Disposition": 'attachment; filename="caldav.mobileconfig"',
 	});
+});
+
+// --- MCP endpoint (Streamable HTTP, JSON-RPC) ---
+app.all("/mcp", async (c) => {
+	const auth = c.req.header("Authorization");
+	if (!auth?.startsWith("Bearer ") || auth.slice(7) !== c.env.MCP_TOKEN) {
+		return c.text("Unauthorized", 401);
+	}
+	const userId = c.env.MCP_USER_ID || "default";
+	return handleMcpRequest(c.req.raw, c.env.DB, userId);
 });
 
 // --- CalDAV routes ---
