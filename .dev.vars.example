@@ -1,0 +1,23 @@
+# Legacy CalDAV auth (fallback when app_passwords table is empty)
+CALDAV_USERNAME=admin
+CALDAV_PASSWORD=changeme
+
+# better-auth
+BETTER_AUTH_URL=http://localhost:8787
+BETTER_AUTH_SECRET=change-this-to-a-random-32-char-string
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# MCP
+MCP_TOKEN=your-mcp-bearer-token
+MCP_USER_ID=default
+
+# Scheduling (Phase 4)
+RESEND_API_KEY=
+SCHEDULING_EMAIL=scheduling@yourdomain.com
+SCHEDULING_WEBHOOK_SECRET=
+
+# Debug
+DEBUG=false
