@@ -20,13 +20,39 @@ Google 連携で Gmail タスク抽出や自然言語 CRUD を提供する。
 
 ```text
 src/
-├── index.ts                 # Hono app エントリポイント
-├── auth/caldav-token.ts     # Basic 認証 (環境変数ベース、Phase 1 で App Password に置き換え予定)
-└── caldav/
-    ├── handlers.ts          # CalDAV HTTP ハンドラ (PROPFIND, REPORT, PUT, GET, DELETE, PROPPATCH)
-    ├── storage.ts           # D1 ストレージ層 (Calendar, CalendarObject, CalendarChange CRUD)
-    ├── ical.ts              # ICS パース (UID 抽出、VTODO/VEVENT 検証)
-    └── xml.ts               # DAV XML レスポンスビルダ
+├── index.tsx                # Hono app エントリポイント (fetch + email + scheduled handlers)
+├── auth/
+│   ├── auth.ts              # better-auth (Google OAuth + D1)
+│   ├── app-password.ts      # App Password (PBKDF2, 100k iterations)
+│   └── caldav-token.ts      # CalDAV Basic Auth (App Password + legacy fallback)
+├── middleware/
+│   └── auth-guard.ts        # Session-based auth guard
+├── caldav/
+│   ├── handlers.ts          # CalDAV HTTP ハンドラ (PROPFIND, REPORT, PUT, GET, DELETE, PROPPATCH, MKCOL)
+│   ├── storage.ts           # D1 ストレージ層 (Calendar, CalendarObject, CalendarChange CRUD)
+│   ├── ical.ts              # ICS パース (UID 抽出、VTODO/VEVENT 検証)
+│   └── xml.ts               # DAV XML レスポンスビルダ
+├── mcp/
+│   └── handler.ts           # MCP Server (JSON-RPC, 10 tools)
+├── ai/
+│   └── natural-language.ts  # Workers AI 自然言語 CRUD
+├── scheduling/
+│   ├── api.ts               # iTIP/iMIP API エンドポイント
+│   ├── itip.ts              # iTIP 生成/パース (RFC 5546)
+│   ├── storage.ts           # Attendee/Feedback CRUD
+│   ├── email-sender.ts      # Resend API iMIP 送信
+│   └── email-worker.ts      # Email Worker iMIP 受信
+├── integrations/
+│   ├── gmail.ts             # Gmail API client
+│   ├── google-auth.ts       # OAuth token refresh
+│   ├── google-calendar.ts   # Google Calendar API client
+│   └── gmail-worker.ts      # Gmail polling pipeline
+├── setup/
+│   └── mobileconfig.ts      # iOS mobileconfig 生成
+└── pages/
+    ├── login.tsx             # Google OAuth ログインページ
+    ├── dashboard.tsx         # App Password 管理
+    └── setup.tsx             # セットアップガイド
 ```
 
 ### データフロー
@@ -41,8 +67,12 @@ src/
 - `calendars` — カレンダーコレクション (user_id, name, synctoken)
 - `calendar_objects` — VTODO/VEVENT (calendar_id, uid, etag, ics_data)
 - `calendarchanges` — 変更ログ (operation: 1=add, 2=update, 3=delete) ← sync-collection 用
+- `app_passwords` — App Password (PBKDF2 hash, prefix, revoked_at)
+- `attendees` — iTIP attendee tracking (partstat, rsvp)
+- `scheduling_feedback` — DECLINED/COUNTER フィードバック
+- `gmail_sync_state` — Gmail polling 状態
 
-マイグレーションは `migrations/` ディレクトリ。
+マイグレーションは `migrations/` ディレクトリ (0001-0007)。
 
 ### 同期方式
 
@@ -57,9 +87,11 @@ sync-token はカレンダーごとの整数カウンタ。
 - Hono の型: `Hono<{ Bindings: CloudflareBindings }>`
 - テストは `test/` ディレクトリ、`SELF.fetch()` でインテグレーションテスト
 
-## 認証 (現在)
+## 認証 (3系統)
 
-環境変数 `CALDAV_USERNAME` / `CALDAV_PASSWORD` による単一ユーザー Basic 認証。
-ローカルでは `.dev.vars` から読み込み。
+1. **Web / API**: better-auth (Google OAuth) → session cookie
+2. **CalDAV**: App Password (PBKDF2) + Basic Auth — ダッシュボードで発行/リボーク
+3. **MCP**: Bearer token (`MCP_TOKEN` 環境変数)
 
-Phase 1 で better-auth (Google OAuth) + App Password (CalDAV Basic Auth) + MCP Bearer token の3系統に移行予定。
+レガシー fallback: `CALDAV_USERNAME` / `CALDAV_PASSWORD` 環境変数 (App Password 未設定時)。
+環境変数テンプレート: `.dev.vars.example`

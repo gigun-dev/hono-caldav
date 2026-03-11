@@ -102,7 +102,7 @@ CREATE TABLE app_passwords (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
   name TEXT NOT NULL DEFAULT 'Default',          -- 識別名
-  password_hash TEXT NOT NULL,                   -- SHA-256 hash
+  password_hash TEXT NOT NULL,                   -- PBKDF2 (100k iterations, salt:hash format)
   prefix TEXT NOT NULL,                          -- 先頭 8 文字 (表示用)
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_used_at TEXT,

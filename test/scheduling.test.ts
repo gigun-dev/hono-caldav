@@ -11,6 +11,9 @@ import {
 	addAttendees,
 	getAttendees,
 	updatePartstat,
+	markSent,
+	findObjectByUidGlobal,
+	addFeedback,
 } from "../src/scheduling/storage.js";
 import { putObject } from "../src/caldav/storage.js";
 
@@ -268,6 +271,144 @@ describe("Attendee storage", () => {
 		expect(
 			attendees.find((a) => a.email === "update-test@test.com")?.repliedAt,
 		).not.toBeNull();
+	});
+
+	it("returns false when updating non-existent attendee", async () => {
+		const updated = await updatePartstat(
+			env.DB,
+			objectId,
+			"nobody@test.com",
+			"ACCEPTED",
+		);
+		expect(updated).toBe(false);
+	});
+
+	it("marks attendee as sent", async () => {
+		await addAttendees(env.DB, objectId, [
+			{ email: "sent-test@test.com" },
+		]);
+
+		await markSent(env.DB, objectId, "sent-test@test.com");
+
+		const attendees = await getAttendees(env.DB, objectId);
+		const att = attendees.find((a) => a.email === "sent-test@test.com");
+		expect(att?.sentAt).not.toBeNull();
+	});
+
+	it("handles case-insensitive email in addAttendees", async () => {
+		await addAttendees(env.DB, objectId, [
+			{ email: "CaseTest@Test.COM" },
+		]);
+
+		const attendees = await getAttendees(env.DB, objectId);
+		const att = attendees.find((a) => a.email === "casetest@test.com");
+		expect(att).toBeDefined();
+	});
+});
+
+describe("findObjectByUidGlobal", () => {
+	let testUid: string;
+
+	beforeAll(async () => {
+		testUid = "global-find-" + crypto.randomUUID().slice(0, 8);
+		await env.DB.prepare(
+			"INSERT INTO calendars (user_id, name, component_type) VALUES (?, ?, ?)",
+		)
+			.bind("global-test", "Global Find Cal", "VEVENT")
+			.run();
+		const cal = await env.DB.prepare(
+			"SELECT id FROM calendars WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+		)
+			.bind("global-test")
+			.first<{ id: number }>();
+		await env.DB.prepare(
+			"INSERT INTO calendar_objects (calendar_id, uid, etag, ics_data) VALUES (?, ?, ?, ?)",
+		)
+			.bind(cal!.id, testUid, '"find-etag"', "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR")
+			.run();
+	});
+
+	it("finds object by UID across all calendars", async () => {
+		const result = await findObjectByUidGlobal(env.DB, testUid);
+		expect(result).not.toBeNull();
+		expect(result!.icsData).toContain("BEGIN:VCALENDAR");
+	});
+
+	it("returns null for non-existent UID", async () => {
+		const result = await findObjectByUidGlobal(env.DB, "does-not-exist-uid");
+		expect(result).toBeNull();
+	});
+});
+
+describe("Feedback storage", () => {
+	let feedbackObjectId: number;
+
+	beforeAll(async () => {
+		await env.DB.prepare(
+			"INSERT INTO calendars (user_id, name, component_type) VALUES (?, ?, ?)",
+		)
+			.bind("feedback-test", "Feedback Cal", "VEVENT")
+			.run();
+		const cal = await env.DB.prepare(
+			"SELECT id FROM calendars WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+		)
+			.bind("feedback-test")
+			.first<{ id: number }>();
+		const fbUid = "feedback-" + crypto.randomUUID().slice(0, 8);
+		await env.DB.prepare(
+			"INSERT INTO calendar_objects (calendar_id, uid, etag, ics_data) VALUES (?, ?, ?, ?)",
+		)
+			.bind(cal!.id, fbUid, '"fb-etag"', "BEGIN:VCALENDAR\r\nEND:VCALENDAR")
+			.run();
+		const obj = await env.DB.prepare(
+			"SELECT id FROM calendar_objects WHERE uid = ?",
+		)
+			.bind(fbUid)
+			.first<{ id: number }>();
+		feedbackObjectId = obj!.id;
+	});
+
+	it("stores DECLINED feedback", async () => {
+		await addFeedback(env.DB, {
+			calendarObjectId: feedbackObjectId,
+			attendeeEmail: "alice-fb@test.com",
+			feedbackType: "DECLINED",
+			originalDtstart: "20260315T100000Z",
+			originalDtend: "20260315T110000Z",
+			proposedDtstart: null,
+			proposedDtend: null,
+		});
+
+		const rows = await env.DB.prepare(
+			"SELECT * FROM scheduling_feedback WHERE calendar_object_id = ? AND attendee_email = ?",
+		)
+			.bind(feedbackObjectId, "alice-fb@test.com")
+			.all();
+		expect(rows.results.length).toBeGreaterThanOrEqual(1);
+		expect((rows.results[0] as Record<string, unknown>).feedback_type).toBe("DECLINED");
+	});
+
+	it("stores COUNTER feedback with proposed times", async () => {
+		await addFeedback(env.DB, {
+			calendarObjectId: feedbackObjectId,
+			attendeeEmail: "counter-user@test.com",
+			feedbackType: "COUNTER",
+			originalDtstart: "20260315T100000Z",
+			originalDtend: "20260315T110000Z",
+			proposedDtstart: "20260316T140000Z",
+			proposedDtend: "20260316T150000Z",
+		});
+
+		const rows = await env.DB.prepare(
+			"SELECT * FROM scheduling_feedback WHERE attendee_email = ?",
+		)
+			.bind("counter-user@test.com")
+			.all();
+		expect(rows.results.length).toBe(1);
+		const row = rows.results[0] as Record<string, unknown>;
+		expect(row.feedback_type).toBe("COUNTER");
+		expect(row.proposed_dtstart).toBe("20260316T140000Z");
+		expect(row.proposed_dtend).toBe("20260316T150000Z");
 	});
 });
 

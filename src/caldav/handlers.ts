@@ -35,6 +35,7 @@ import {
 	getDepthHeader,
 	parsePropFilter,
 } from "./xml.js";
+import { parseCalendarFilter, applyFilter } from "./query-filter.js";
 
 const MAX_BODY_SIZE = 256 * 1024; // 256KB
 
@@ -171,8 +172,12 @@ function parseBasicAuth(header: string | undefined): {
 }
 
 function normalizeUidParam(rawValue: string): string | null {
-	const uid = decodeURIComponent(rawValue).replace(/\.ics$/i, "");
-	return uid || null;
+	try {
+		const uid = decodeURIComponent(rawValue).replace(/\.ics$/i, "");
+		return uid || null;
+	} catch {
+		return null;
+	}
 }
 
 async function requireAuth(
@@ -289,6 +294,10 @@ export function registerCaldavRoutes(
 		if (isSyncCollection) {
 			const clientToken = requestSyncToken ? Number(requestSyncToken) : 0;
 
+			if (requestSyncToken && Number.isNaN(clientToken)) {
+				return c.text("Invalid sync-token", 400);
+			}
+
 			if (clientToken > 0) {
 				// Incremental sync via calendarchanges
 				const changes = await getChangesSince(c.env.DB, cal.id, clientToken);
@@ -345,7 +354,7 @@ export function registerCaldavRoutes(
 			);
 		}
 
-		const objects = await getObjectsForCalendar(c.env.DB, cal.id);
+		let objects = await getObjectsForCalendar(c.env.DB, cal.id);
 
 		if (isMultiget) {
 			// Collect deleted URIs from calendarchanges (operation=3)
@@ -367,7 +376,16 @@ export function registerCaldavRoutes(
 			);
 		}
 
-		return buildCalendarQueryResponse(c, cal, objects, true, currentSyncToken);
+		// Apply calendar-query filter (comp-filter, time-range, prop-filter)
+		const filter = parseCalendarFilter(body);
+		if (filter) {
+			objects = applyFilter(objects, filter);
+		}
+
+		// Check if calendar-data was requested
+		const withCalendarData = body.includes("calendar-data");
+
+		return buildCalendarQueryResponse(c, cal, objects, withCalendarData, currentSyncToken);
 	};
 
 	const handleProjectPropPatch = async (

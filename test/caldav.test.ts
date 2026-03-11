@@ -1170,3 +1170,56 @@ describe("PROPFIND property filtering", () => {
 		expect(xml).toContain("getctag");
 	});
 });
+
+describe("CalDAV edge cases", () => {
+	let calendarId: number;
+
+	beforeAll(async () => {
+		await env.DB.prepare(
+			"INSERT INTO calendars (user_id, name, component_type) VALUES (?, ?, ?)",
+		)
+			.bind("default", "Edge Case Cal", "VTODO")
+			.run();
+		const row = await env.DB.prepare(
+			"SELECT id FROM calendars WHERE user_id = ? AND name = ? ORDER BY id DESC LIMIT 1",
+		)
+			.bind("default", "Edge Case Cal")
+			.first<{ id: number }>();
+		calendarId = row!.id;
+	});
+
+	it("handles malformed percent-encoded UID gracefully", async () => {
+		const res = await request("GET", `/dav/projects/${calendarId}/%ZZinvalid.ics`);
+		expect(res.status).toBe(404);
+	});
+
+	it("rejects invalid sync-token with 400", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<d:sync-collection xmlns:d="DAV:">
+  <d:sync-token>not-a-number</d:sync-token>
+  <d:prop>
+    <d:getetag/>
+  </d:prop>
+</d:sync-collection>`;
+		const res = await request("REPORT", `/dav/projects/${calendarId}/`, {
+			body,
+		});
+		expect(res.status).toBe(400);
+		const text = await res.text();
+		expect(text).toContain("Invalid sync-token");
+	});
+
+	it("accepts valid numeric sync-token", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<d:sync-collection xmlns:d="DAV:">
+  <d:sync-token>0</d:sync-token>
+  <d:prop>
+    <d:getetag/>
+  </d:prop>
+</d:sync-collection>`;
+		const res = await request("REPORT", `/dav/projects/${calendarId}/`, {
+			body,
+		});
+		expect(res.status).toBe(207);
+	});
+});
