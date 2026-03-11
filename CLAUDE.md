@@ -80,7 +80,7 @@ src/
 
 - `calendar_shares` — カレンダー共有 (calendar_id, owner_id, shared_with_id, permission)
 
-マイグレーションは `migrations/` ディレクトリ (0001-0009)。
+マイグレーションは `migrations/` ディレクトリ (0001-0011)。
 
 ### 同期方式
 
@@ -93,7 +93,7 @@ sync-token はカレンダーごとの整数カウンタ。
 - TypeScript strict モード
 - `.js` 拡張子付きインポート (`./storage.js`)
 - Hono の型: `Hono<{ Bindings: CloudflareBindings }>`
-- テストは `test/` ディレクトリ、`SELF.fetch()` でインテグレーションテスト (304+ テスト / 14 ファイル)
+- テストは `test/` ディレクトリ、`SELF.fetch()` でインテグレーションテスト (337+ テスト / 17 ファイル)
 
 ## 主要機能
 

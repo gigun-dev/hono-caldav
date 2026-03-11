@@ -75,7 +75,13 @@ export async function handleAuthorize(
 	}
 
 	// Validate redirect_uri
-	const allowedUris: string[] = JSON.parse(client.redirect_uris);
+	let allowedUris: string[];
+	try {
+		allowedUris = JSON.parse(client.redirect_uris);
+		if (!Array.isArray(allowedUris)) throw new Error("not an array");
+	} catch {
+		return c.json({ error: "server_error", error_description: "Invalid client configuration" }, 500);
+	}
 	if (!allowedUris.includes(redirectUri)) {
 		return c.json({ error: "invalid_redirect_uri" }, 400);
 	}
@@ -119,15 +125,19 @@ export async function handleToken(
 ): Promise<Response> {
 	let params: Record<string, string>;
 
-	const contentType = c.req.header("content-type") || "";
-	if (contentType.includes("application/json")) {
-		params = await c.req.json();
-	} else {
-		const formData = await c.req.parseBody();
-		params = {} as Record<string, string>;
-		for (const [k, v] of Object.entries(formData)) {
-			params[k] = String(v);
+	try {
+		const contentType = c.req.header("content-type") || "";
+		if (contentType.includes("application/json")) {
+			params = await c.req.json();
+		} else {
+			const formData = await c.req.parseBody();
+			params = {} as Record<string, string>;
+			for (const [k, v] of Object.entries(formData)) {
+				params[k] = String(v);
+			}
 		}
+	} catch {
+		return c.json({ error: "invalid_request", error_description: "Invalid request body" }, 400);
 	}
 
 	const grantType = params.grant_type;
@@ -323,15 +333,19 @@ export async function handleRevoke(
 ): Promise<Response> {
 	let params: Record<string, string>;
 
-	const contentType = c.req.header("content-type") || "";
-	if (contentType.includes("application/json")) {
-		params = await c.req.json();
-	} else {
-		const formData = await c.req.parseBody();
-		params = {} as Record<string, string>;
-		for (const [k, v] of Object.entries(formData)) {
-			params[k] = String(v);
+	try {
+		const contentType = c.req.header("content-type") || "";
+		if (contentType.includes("application/json")) {
+			params = await c.req.json();
+		} else {
+			const formData = await c.req.parseBody();
+			params = {} as Record<string, string>;
+			for (const [k, v] of Object.entries(formData)) {
+				params[k] = String(v);
+			}
 		}
+	} catch {
+		return c.json({});
 	}
 
 	const token = params.token;

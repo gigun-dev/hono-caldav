@@ -8,13 +8,15 @@
 - Scheduling: iTIP/iMIP (SaaS as Organizer)
 - Webhook: HMAC-SHA256 署名付き通知
 - 監視: /health エンドポイント + 構造化 JSON ログ
-- テスト: 304+テスト / 14ファイル
+- テスト: 337+テスト / 17ファイル
 
 ### 完了した Phase
 - **Phase 5a** ✅ calendar-query filter (comp/prop/time-range/text-match), Duplicate UID 拒否, Depth:infinity, 非 ASCII, カレンダー削除
 - **Phase 5c** ✅ RRULE 繰り返しイベント展開 (time-range クエリ内)
 - **Phase 6b** ✅ /health エンドポイント, 構造化ログ (requestId, durationMs)
 - **Phase 7b** ✅ Webhook 通知 (HMAC-SHA256, タスク CRUD イベント)
+- **Phase 5b** ✅ MCP OAuth (Authorization Code + PKCE, D1ベース, well-known metadata, legacy互換)
+- **Phase 6a** ✅ Performance (レートリミット, バッチ INSERT, updatePartstat最適化, D1インデックス)
 - **Phase 7c** ✅ カレンダー共有 (share/list/revoke, IDOR 防止)
 
 ---
@@ -54,7 +56,7 @@ calendar-query REPORT のフィルタリングが未実装。これは iOS/macOS
 
 ---
 
-## Phase 5b: MCP OAuth (workers-oauth-provider) — 未着手
+## Phase 5b: MCP OAuth (workers-oauth-provider) ✅ 完了
 
 ### 背景
 現在の MCP は Bearer token (環境変数) 認証。MCP 標準 OAuth に移行すると、
@@ -101,7 +103,7 @@ Claude Desktop 等から動的にユーザー認証できるようになる。
 
 ## Phase 6: プロダクション対応 — 一部完了
 
-### 6a: パフォーマンス — 未着手
+### 6a: パフォーマンス ✅ 完了
 
 1. **D1 クエリ最適化**
    - calendar_objects に (calendar_id, uid) 複合インデックス
@@ -170,9 +172,9 @@ Claude Desktop 等から動的にユーザー認証できるようになる。
 |-------|------|--------|-------------|------|
 | 5a | calendar-query フィルタ | 中 | 高 | ✅ 完了 |
 | 5a | 非 ASCII 対応 | 低 | 中 | ✅ 完了 |
-| 5b | MCP OAuth | 高 | 高 | 未着手 |
+| 5b | MCP OAuth | 高 | 高 | ✅ 完了 |
 | 5c | RRULE 展開 | 高 | 高 | ✅ 完了 |
-| 6a | D1 最適化 | 中 | 中 | 未着手 |
+| 6a | D1 最適化 | 中 | 中 | ✅ 完了 |
 | 6b | 監視・ログ | 低 | 中 | ✅ 完了 |
 | 6c | マルチテナント | 高 | 低 (初期) | 未着手 |
 | 7a | CalDAV Client SDK | 中 | 中 | 未着手 |

@@ -122,6 +122,21 @@
 
 ---
 
+## Phase 5b: MCP OAuth
+
+### Features
+- Authorization Code + PKCE flow for MCP authentication
+- D1-based token/client storage (Durable Objects 不要)
+- `/.well-known/oauth-authorization-server` metadata endpoint
+- `/mcp/authorize`, `/mcp/token`, `/mcp/callback` endpoints
+- Legacy Bearer token 互換 (既存クライアント対応)
+
+### Files Added
+- `src/mcp/oauth.ts` — OAuth provider implementation
+- `migrations/0010_mcp_oauth.sql` — OAuth clients/tokens tables
+
+---
+
 ## Phase 5c: RRULE Recurring Events (`5369ee0`)
 
 ### Features
@@ -137,6 +152,20 @@
 - `/health` endpoint with D1 connectivity check
 - Structured JSON logging (requestId, durationMs, userAgent)
 - Request/response logging gated by DEBUG env var
+
+---
+
+## Phase 6a: Performance
+
+### Features
+- Per-user レートリミット (sliding window)
+- Attendee バッチ INSERT 最適化
+- updatePartstat クエリ最適化
+- D1 インデックス追加 (calendar_objects, calendarchanges 複合インデックス)
+
+### Files Added
+- `src/middleware/rate-limit.ts` — Rate limiting middleware
+- `migrations/0011_indexes.sql` — Performance indexes
 
 ---
 
@@ -201,5 +230,7 @@
 | natural-language-e2e.test.ts | 9 | ICS escaping, edge cases |
 | webhooks.test.ts | TBD | Webhook CRUD, HMAC signing, event delivery |
 | sharing.test.ts | 9 | Calendar sharing API, ownership, IDOR, duplicate prevention |
+| mcp-oauth.test.ts | 21 | MCP OAuth flow, PKCE, token management, well-known metadata |
+| rate-limit.test.ts | 8 | Rate limiting, sliding window, per-user isolation |
 | email-sender.test.ts | 4 | Resend API mock |
-| **Total** | **304+** | |
+| **Total** | **337+** | **17 files** |
