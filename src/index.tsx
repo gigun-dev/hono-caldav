@@ -25,6 +25,11 @@ import { handleEmail } from "./scheduling/email-worker.js";
 import { getValidAccessToken } from "./integrations/google-auth.js";
 import { pollGmailForTasks } from "./integrations/gmail-worker.js";
 import { getCalendarsForUser } from "./caldav/storage.js";
+import {
+	createWebhook,
+	listWebhooks,
+	deleteWebhook,
+} from "./webhooks/notify.js";
 
 function timingSafeEqualStr(a: string, b: string): boolean {
 	const encoder = new TextEncoder();
@@ -221,6 +226,43 @@ app.all("/mcp", async (c) => {
 	}
 	const userId = c.env.MCP_USER_ID || "default";
 	return handleMcpRequest(c.req.raw, c.env.DB, userId, c.env);
+});
+
+// --- Webhook API ---
+app.post("/api/webhooks", authGuard, async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json<{
+		url?: string;
+		events?: string;
+		secret?: string;
+	}>();
+	if (!body.url || !body.secret) {
+		return c.json({ error: "url and secret are required" }, 400);
+	}
+	const events = body.events || "create,update,delete";
+	// Validate event names
+	const validEvents = ["create", "update", "delete"];
+	const eventList = events.split(",").map((e) => e.trim());
+	if (eventList.some((e) => !validEvents.includes(e))) {
+		return c.json({ error: "Invalid events. Allowed: create, update, delete" }, 400);
+	}
+	const webhook = await createWebhook(c.env.DB, user.id, body.url, events, body.secret);
+	return c.json(webhook, 201);
+});
+
+app.get("/api/webhooks", authGuard, async (c) => {
+	const user = c.get("user");
+	const webhooks = await listWebhooks(c.env.DB, user.id);
+	return c.json(webhooks);
+});
+
+app.delete("/api/webhooks/:id", authGuard, async (c) => {
+	const user = c.get("user");
+	const deleted = await deleteWebhook(c.env.DB, user.id, c.req.param("id"));
+	if (!deleted) {
+		return c.json({ error: "Webhook not found" }, 404);
+	}
+	return c.body(null, 204);
 });
 
 // --- Health check ---

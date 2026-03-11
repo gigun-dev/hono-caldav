@@ -470,11 +470,13 @@ function matchesVeventTimeRange(
 	if (!dtstart) return true;
 
 	const startTs = parseIcsDate(dtstart);
+	if (Number.isNaN(startTs)) return true; // Malformed date → include conservatively
 	const endTs = dtend ? parseIcsDate(dtend) : startTs;
+	const effectiveEnd = Number.isNaN(endTs) ? startTs : endTs;
 
 	// Check if the base event itself overlaps with the range
 	const baseOverlaps =
-		(end === null || startTs < end) && (start === null || endTs > start);
+		(end === null || startTs < end) && (start === null || effectiveEnd > start);
 
 	if (baseOverlaps) return true;
 
@@ -542,8 +544,11 @@ function matchesPropertyTimeRange(
 	tr: TimeRange,
 ): boolean {
 	const ts = parseIcsDate(propValue);
-	const start = tr.start ? parseIcsDate(tr.start) : null;
-	const end = tr.end ? parseIcsDate(tr.end) : null;
+	if (Number.isNaN(ts)) return true; // Malformed date → include conservatively
+	const startRaw = tr.start ? parseIcsDate(tr.start) : null;
+	const endRaw = tr.end ? parseIcsDate(tr.end) : null;
+	const start = startRaw !== null && !Number.isNaN(startRaw) ? startRaw : null;
+	const end = endRaw !== null && !Number.isNaN(endRaw) ? endRaw : null;
 
 	if (start !== null && ts < start) return false;
 	if (end !== null && ts >= end) return false;

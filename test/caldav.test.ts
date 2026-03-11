@@ -749,6 +749,112 @@ describe("Extended MKCOL", () => {
 	});
 });
 
+// === 9b. MKCALENDAR (RFC 4791 §5.3.1, via POST + X-Caldav-Method proxy) ===
+
+describe("MKCALENDAR (proxy)", () => {
+	it("creates a VTODO calendar via POST + X-Caldav-Method header", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<c:mkcalendar xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:set>
+    <d:prop>
+      <d:displayname>MKCALENDAR Tasks</d:displayname>
+      <c:supported-calendar-component-set>
+        <c:comp name="VTODO"/>
+      </c:supported-calendar-component-set>
+    </d:prop>
+  </d:set>
+</c:mkcalendar>`;
+
+		const res = await SELF.fetch("http://localhost/dav/projects/mkcal-tasks", {
+			method: "POST",
+			headers: {
+				Authorization: AUTH,
+				"X-Caldav-Method": "MKCALENDAR",
+			},
+			body,
+		});
+		expect(res.status).toBe(201);
+		const location = res.headers.get("Location");
+		expect(location).toBeTruthy();
+		expect(location).toMatch(/\/dav\/projects\/\d+\//);
+	});
+
+	it("creates a VEVENT calendar via MKCALENDAR proxy", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<c:mkcalendar xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:set>
+    <d:prop>
+      <d:displayname>MKCALENDAR Events</d:displayname>
+      <c:supported-calendar-component-set>
+        <c:comp name="VEVENT"/>
+      </c:supported-calendar-component-set>
+    </d:prop>
+  </d:set>
+</c:mkcalendar>`;
+
+		const res = await SELF.fetch("http://localhost/dav/projects/mkcal-events", {
+			method: "POST",
+			headers: {
+				Authorization: AUTH,
+				"X-Caldav-Method": "MKCALENDAR",
+			},
+			body,
+		});
+		expect(res.status).toBe(201);
+		const location = res.headers.get("Location");
+		expect(location).toBeTruthy();
+	});
+
+	it("returns 405 when POST has no X-Caldav-Method header", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<c:mkcalendar xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:set><d:prop><d:displayname>Nope</d:displayname></d:prop></d:set>
+</c:mkcalendar>`;
+
+		const res = await SELF.fetch("http://localhost/dav/projects/bad-post", {
+			method: "POST",
+			headers: { Authorization: AUTH },
+			body,
+		});
+		expect(res.status).toBe(405);
+	});
+
+	it("returns 401 without credentials", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<c:mkcalendar xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:set><d:prop><d:displayname>Unauth</d:displayname></d:prop></d:set>
+</c:mkcalendar>`;
+
+		const res = await SELF.fetch("http://localhost/dav/projects/unauth", {
+			method: "POST",
+			headers: { "X-Caldav-Method": "MKCALENDAR" },
+			body,
+		});
+		expect(res.status).toBe(401);
+	});
+
+	it("MKCALENDAR defaults to VTODO when no comp specified", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<c:mkcalendar xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:set>
+    <d:prop>
+      <d:displayname>Default Comp</d:displayname>
+    </d:prop>
+  </d:set>
+</c:mkcalendar>`;
+
+		const res = await SELF.fetch("http://localhost/dav/projects/default-comp", {
+			method: "POST",
+			headers: {
+				Authorization: AUTH,
+				"X-Caldav-Method": "MKCALENDAR",
+			},
+			body,
+		});
+		expect(res.status).toBe(201);
+	});
+});
+
 // === 10. VEVENT PUT/GET ===
 
 describe("VEVENT PUT/GET", () => {
@@ -1083,6 +1189,7 @@ describe("CalDAV edge cases", () => {
 		expect(allow).toContain("PUT");
 		expect(allow).toContain("DELETE");
 		expect(allow).toContain("MKCOL");
+		expect(allow).toContain("MKCALENDAR");
 	});
 
 	it("DELETE with If-Match fails when ETag does not match (412)", async () => {

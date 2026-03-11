@@ -20,6 +20,7 @@ import {
 	updateCalendarDisplayName,
 	updateCalendarOrder,
 } from "./storage.js";
+import { fireWebhook } from "../webhooks/notify.js";
 import {
 	buildCalendarCollectionResponse,
 	buildCalendarMultigetResponse,
@@ -59,7 +60,7 @@ async function readBodyWithLimit(
 
 const DAV_HEADERS = {
 	DAV: "1, calendar-access, sync-collection, extended-mkcol",
-	Allow: "OPTIONS, PROPFIND, REPORT, GET, PUT, DELETE, PROPPATCH, MKCOL",
+	Allow: "OPTIONS, PROPFIND, REPORT, GET, PUT, DELETE, PROPPATCH, MKCOL, MKCALENDAR",
 };
 
 const PROPFIND_FINITE_DEPTH_ERROR = `<?xml version="1.0" encoding="utf-8"?>
@@ -591,7 +592,7 @@ export function registerCaldavRoutes(
 			return c.text("Object not found", 404);
 		}
 		const ifNoneMatch = c.req.header("if-none-match");
-		if (ifNoneMatch && ifNoneMatch === obj.etag) {
+		if (ifNoneMatch && (ifNoneMatch === "*" || ifNoneMatch === obj.etag)) {
 			return c.body(null, 304, {
 				ETag: obj.etag,
 			});
@@ -697,6 +698,15 @@ export function registerCaldavRoutes(
 
 		const { object, created } = await putObject(c.env.DB, cal.id, uid, icsData);
 
+		// Fire webhook notification (fire-and-forget)
+		fireWebhook(
+			c.env.DB,
+			user.id,
+			created ? "create" : "update",
+			{ calendarId: cal.id, uid },
+			c.executionCtx,
+		);
+
 		if (created) {
 			return c.text(object.icsData, 201, {
 				ETag: object.etag,
@@ -746,6 +756,16 @@ export function registerCaldavRoutes(
 		if (!deleted) {
 			return c.text("Object not found", 404);
 		}
+
+		// Fire webhook notification (fire-and-forget)
+		fireWebhook(
+			c.env.DB,
+			user.id,
+			"delete",
+			{ calendarId: cal.id, uid },
+			c.executionCtx,
+		);
+
 		return c.body(null, 204);
 	});
 }
