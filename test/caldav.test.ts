@@ -1332,3 +1332,195 @@ describe("Depth:infinity rejection", () => {
 		expect(xml).toContain("propfind-finite-depth");
 	});
 });
+
+// === Non-ASCII content ===
+
+describe("Non-ASCII content", () => {
+	let calendarId: number;
+	beforeAll(async () => {
+		calendarId = await seedCalendar("Non-ASCII Test", "VTODO");
+		// Seed all non-ASCII objects upfront so REPORT tests can find them
+		const jpIcs = makeVtodo("nonascii-jp-1", "牛乳を買う");
+		await request("PUT", `/dav/projects/${calendarId}/nonascii-jp-1.ics`, {
+			body: jpIcs,
+			headers: { "Content-Type": "text/calendar" },
+		});
+		const emojiIcs = makeVtodo("nonascii-emoji-1", "Buy groceries 🛒🍎");
+		await request(
+			"PUT",
+			`/dav/projects/${calendarId}/nonascii-emoji-1.ics`,
+			{
+				body: emojiIcs,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		const cnIcs = [
+			"BEGIN:VCALENDAR",
+			"VERSION:2.0",
+			"PRODID:-//Test//Test//EN",
+			"BEGIN:VTODO",
+			"UID:nonascii-cn-1",
+			"DTSTAMP:20250101T000000Z",
+			"SUMMARY:中文任务",
+			"DESCRIPTION:这是一个用中文描述的任务，需要在周五之前完成。",
+			"STATUS:NEEDS-ACTION",
+			"END:VTODO",
+			"END:VCALENDAR",
+		].join("\r\n");
+		await request("PUT", `/dav/projects/${calendarId}/nonascii-cn-1.ics`, {
+			body: cnIcs,
+			headers: { "Content-Type": "text/calendar" },
+		});
+	});
+
+	it("PUT VTODO with Japanese SUMMARY succeeds and GET returns correct data", async () => {
+		const getRes = await request(
+			"GET",
+			`/dav/projects/${calendarId}/nonascii-jp-1.ics`,
+		);
+		expect(getRes.status).toBe(200);
+		const text = await getRes.text();
+		expect(text).toContain("牛乳を買う");
+	});
+
+	it("PUT VTODO with emoji in SUMMARY succeeds and GET returns correct data", async () => {
+		const getRes = await request(
+			"GET",
+			`/dav/projects/${calendarId}/nonascii-emoji-1.ics`,
+		);
+		expect(getRes.status).toBe(200);
+		const text = await getRes.text();
+		expect(text).toContain("Buy groceries 🛒🍎");
+	});
+
+	it("PUT VTODO with Chinese characters in DESCRIPTION succeeds", async () => {
+		const getRes = await request(
+			"GET",
+			`/dav/projects/${calendarId}/nonascii-cn-1.ics`,
+		);
+		expect(getRes.status).toBe(200);
+		const text = await getRes.text();
+		expect(text).toContain("中文任务");
+		expect(text).toContain("这是一个用中文描述的任务，需要在周五之前完成。");
+	});
+
+	it("REPORT lists non-ASCII objects correctly", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop>
+    <d:getetag/>
+    <c:calendar-data/>
+  </d:prop>
+  <c:filter>
+    <c:comp-filter name="VCALENDAR">
+      <c:comp-filter name="VTODO"/>
+    </c:comp-filter>
+  </c:filter>
+</c:calendar-query>`;
+
+		const res = await request("REPORT", `/dav/projects/${calendarId}/`, {
+			body,
+		});
+		expect(res.status).toBe(207);
+		const xml = await res.text();
+		expect(xml).toContain("牛乳を買う");
+		expect(xml).toContain("Buy groceries 🛒🍎");
+		expect(xml).toContain("中文任务");
+	});
+
+	it("Calendar-query filter text-match works with non-ASCII text", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop>
+    <d:getetag/>
+    <c:calendar-data/>
+  </d:prop>
+  <c:filter>
+    <c:comp-filter name="VCALENDAR">
+      <c:comp-filter name="VTODO">
+        <c:prop-filter name="SUMMARY">
+          <c:text-match collation="i;unicode-casemap" match-type="contains">牛乳</c:text-match>
+        </c:prop-filter>
+      </c:comp-filter>
+    </c:comp-filter>
+  </c:filter>
+</c:calendar-query>`;
+
+		const res = await request("REPORT", `/dav/projects/${calendarId}/`, {
+			body,
+		});
+		expect(res.status).toBe(207);
+		const xml = await res.text();
+		expect(xml).toContain("牛乳を買う");
+		expect(xml).not.toContain("Buy groceries");
+		expect(xml).not.toContain("中文任务");
+	});
+});
+
+// === DELETE calendar collection ===
+
+describe("DELETE calendar collection", () => {
+	it("DELETE on calendar collection returns 204", async () => {
+		const calendarId = await seedCalendar("Delete Me Calendar", "VTODO");
+
+		// Add an object to the calendar
+		const ics = makeVtodo("del-cal-obj-1", "Task in deleted calendar");
+		await request("PUT", `/dav/projects/${calendarId}/del-cal-obj-1.ics`, {
+			body: ics,
+			headers: { "Content-Type": "text/calendar" },
+		});
+
+		const res = await request("DELETE", `/dav/projects/${calendarId}/`);
+		expect(res.status).toBe(204);
+	});
+
+	it("GET on deleted calendar returns 404", async () => {
+		const calendarId = await seedCalendar("Delete Me Calendar 2", "VTODO");
+
+		const res1 = await request("DELETE", `/dav/projects/${calendarId}/`);
+		expect(res1.status).toBe(204);
+
+		// PROPFIND on deleted calendar should return 404
+		const res2 = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			headers: { Depth: "0" },
+		});
+		expect(res2.status).toBe(404);
+	});
+
+	it("Objects in deleted calendar are also gone", async () => {
+		const calendarId = await seedCalendar("Delete Me Calendar 3", "VTODO");
+
+		// Add objects
+		const ics1 = makeVtodo("del-cal-obj-2", "Task A");
+		const ics2 = makeVtodo("del-cal-obj-3", "Task B");
+		await request("PUT", `/dav/projects/${calendarId}/del-cal-obj-2.ics`, {
+			body: ics1,
+			headers: { "Content-Type": "text/calendar" },
+		});
+		await request("PUT", `/dav/projects/${calendarId}/del-cal-obj-3.ics`, {
+			body: ics2,
+			headers: { "Content-Type": "text/calendar" },
+		});
+
+		// Delete the calendar
+		await request("DELETE", `/dav/projects/${calendarId}/`);
+
+		// Verify objects are gone (GET on objects should return 404 since calendar is gone)
+		const res1 = await request(
+			"GET",
+			`/dav/projects/${calendarId}/del-cal-obj-2.ics`,
+		);
+		expect(res1.status).toBe(404);
+
+		const res2 = await request(
+			"GET",
+			`/dav/projects/${calendarId}/del-cal-obj-3.ics`,
+		);
+		expect(res2.status).toBe(404);
+	});
+
+	it("DELETE on non-existent calendar returns 404", async () => {
+		const res = await request("DELETE", "/dav/projects/99999/");
+		expect(res.status).toBe(404);
+	});
+});
