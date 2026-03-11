@@ -23,6 +23,10 @@ import {
 } from "./storage.js";
 import { fireWebhook } from "../webhooks/notify.js";
 import {
+	checkCalendarLimit,
+	checkObjectLimit,
+} from "../middleware/tier-limits.js";
+import {
 	buildCalendarCollectionResponse,
 	buildCalendarMultigetResponse,
 	buildCalendarQueryResponse,
@@ -501,6 +505,12 @@ export function registerCaldavRoutes(
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
+		// Tier limit check: calendar count
+		const canCreate = await checkCalendarLimit(c.env.DB, user.id);
+		if (!canCreate) {
+			return c.text("Insufficient Storage", 507);
+		}
+
 		const read = await readBodyWithLimit(c);
 		if ("error" in read) {
 			return read.error;
@@ -711,6 +721,11 @@ export function registerCaldavRoutes(
 		// check that no other resource in this calendar has the same UID.
 		const existingByPath = await getObjectByUid(c.env.DB, cal.id, uid);
 		if (!existingByPath) {
+			// Tier limit check: object count per calendar (only for new resources)
+			const canAdd = await checkObjectLimit(c.env.DB, user.id, cal.id);
+			if (!canAdd) {
+				return c.text("Insufficient Storage", 507);
+			}
 			// This is a new resource — check for UID conflict
 			const icsUid = extractUid(icsData);
 			if (icsUid) {

@@ -43,6 +43,10 @@ import {
 	revokeShare,
 	getSharedCalendars,
 } from "./sharing/api.js";
+import {
+	getUserTierInfo,
+	createStripeCheckoutSession,
+} from "./middleware/tier-limits.js";
 
 function timingSafeEqualStr(a: string, b: string): boolean {
 	const encoder = new TextEncoder();
@@ -394,6 +398,26 @@ app.get("/api/shared-calendars", authGuard, async (c) => {
 	const user = c.get("user");
 	const shared = await getSharedCalendars(c.env.DB, user.id);
 	return c.json(shared);
+});
+
+// --- Tier API ---
+app.get("/api/tier", authGuard, async (c) => {
+	const user = c.get("user");
+	const info = await getUserTierInfo(c.env.DB, user.id);
+	return c.json({
+		tier: info.tier,
+		limits: info.limits,
+	});
+});
+
+app.post("/api/tier/upgrade", authGuard, async (c) => {
+	const baseUrl = new URL(c.req.url);
+	const returnUrl = `${baseUrl.protocol}//${baseUrl.host}/dashboard`;
+	const session = await createStripeCheckoutSession(
+		c.get("user").id,
+		returnUrl,
+	);
+	return c.json({ url: session.url });
 });
 
 // --- Health check ---
