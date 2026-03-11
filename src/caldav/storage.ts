@@ -212,8 +212,16 @@ export async function deleteObject(
 
 export async function deleteCalendar(
 	db: D1Database,
+	userId: string,
 	calendarId: number,
-): Promise<void> {
+): Promise<boolean> {
+	// Verify ownership first
+	const cal = await db
+		.prepare("SELECT id FROM calendars WHERE id = ? AND user_id = ?")
+		.bind(calendarId, userId)
+		.first();
+	if (!cal) return false;
+
 	// Delete in order: objects, changes, then the calendar itself
 	await db
 		.prepare("DELETE FROM calendar_objects WHERE calendar_id = ?")
@@ -227,6 +235,7 @@ export async function deleteCalendar(
 		.prepare("DELETE FROM calendars WHERE id = ?")
 		.bind(calendarId)
 		.run();
+	return true;
 }
 
 // --- Sync support ---

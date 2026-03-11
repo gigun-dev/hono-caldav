@@ -106,7 +106,7 @@ function extractInnerContent(
 	const remaining = xml.slice(startPos);
 
 	// Simple scan: find all opening/closing tags and track depth
-	const allTags: { index: number; type: "open" | "close" | "selfclose" }[] =
+	const allTags: { index: number; type: "open" | "close" }[] =
 		[];
 
 	let m: RegExpExecArray | null;
@@ -361,11 +361,9 @@ function matchesPropFilter(
 }
 
 function matchesTextMatch(value: string, tm: TextMatch): boolean {
-	const v = tm.collation === "i;ascii-casemap" ? value.toLowerCase() : value;
-	const target =
-		tm.collation === "i;ascii-casemap"
-			? tm.value.toLowerCase()
-			: tm.value;
+	const caseInsensitive = tm.collation === "i;ascii-casemap" || tm.collation === "i;unicode-casemap";
+	const v = caseInsensitive ? value.toLowerCase() : value;
+	const target = caseInsensitive ? tm.value.toLowerCase() : tm.value;
 
 	let result: boolean;
 	switch (tm.matchType) {
@@ -500,7 +498,7 @@ function matchesVtodoTimeRange(
 	if (due) {
 		const d = parseIcsDate(due);
 		if (start !== null && d <= start) return false;
-		if (end !== null && d > end) return false;
+		if (end !== null && d >= end) return false;
 		return true;
 	}
 	if (completed && created) {
@@ -545,6 +543,7 @@ function parseIcsDate(value: string): number {
 		const y = parseInt(clean.slice(0, 4), 10);
 		const m = parseInt(clean.slice(4, 6), 10) - 1;
 		const d = parseInt(clean.slice(6, 8), 10);
+		if (isNaN(y) || isNaN(m) || isNaN(d)) return NaN;
 		return Date.UTC(y, m, d);
 	}
 	const y = parseInt(clean.slice(0, 4), 10);
@@ -553,5 +552,6 @@ function parseIcsDate(value: string): number {
 	const h = parseInt(clean.slice(9, 11), 10);
 	const min = parseInt(clean.slice(11, 13), 10);
 	const s = parseInt(clean.slice(13, 15), 10);
+	if (isNaN(y) || isNaN(m) || isNaN(d) || isNaN(h) || isNaN(min) || isNaN(s)) return NaN;
 	return Date.UTC(y, m, d, h, min, s);
 }

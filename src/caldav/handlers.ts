@@ -558,11 +558,10 @@ export function registerCaldavRoutes(
 			return buildUnauthorizedResponse(c);
 		}
 		const calendarId = Number(c.req.param("projectId"));
-		const cal = await getCalendarById(c.env.DB, user.id, calendarId);
-		if (!cal) {
+		const deleted = await deleteCalendar(c.env.DB, user.id, calendarId);
+		if (!deleted) {
 			return c.text("Calendar not found", 404);
 		}
-		await deleteCalendar(c.env.DB, calendarId);
 		return c.body(null, 204);
 	};
 
