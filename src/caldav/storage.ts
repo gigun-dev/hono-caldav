@@ -208,6 +208,27 @@ export async function deleteObject(
 	return true;
 }
 
+// --- Calendar deletion ---
+
+export async function deleteCalendar(
+	db: D1Database,
+	calendarId: number,
+): Promise<void> {
+	// Delete in order: objects, changes, then the calendar itself
+	await db
+		.prepare("DELETE FROM calendar_objects WHERE calendar_id = ?")
+		.bind(calendarId)
+		.run();
+	await db
+		.prepare("DELETE FROM calendarchanges WHERE calendar_id = ?")
+		.bind(calendarId)
+		.run();
+	await db
+		.prepare("DELETE FROM calendars WHERE id = ?")
+		.bind(calendarId)
+		.run();
+}
+
 // --- Sync support ---
 
 export async function getChangesSince(

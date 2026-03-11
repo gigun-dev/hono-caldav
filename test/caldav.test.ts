@@ -1171,6 +1171,82 @@ describe("PROPFIND property filtering", () => {
 	});
 });
 
+// === 16. Duplicate UID rejection (RFC 4791) ===
+
+describe("Duplicate UID rejection", () => {
+	let calendarId: number;
+	beforeAll(async () => {
+		calendarId = await seedCalendar("Dup UID Test", "VTODO");
+	});
+
+	it("PUT with new UID succeeds (201)", async () => {
+		const ics = makeVtodo("dup-uid-1", "First task");
+		const res = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/dup-uid-1.ics`,
+			{
+				body: ics,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		expect(res.status).toBe(201);
+	});
+
+	it("PUT with same UID to different resource path returns 409", async () => {
+		// First, create a resource with UID "dup-uid-2"
+		const ics1 = makeVtodo("dup-uid-2", "Original task");
+		const res1 = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/dup-uid-2.ics`,
+			{
+				body: ics1,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		expect(res1.status).toBe(201);
+
+		// Now try to create a different resource with the same UID inside the ICS
+		const ics2 = makeVtodo("dup-uid-2", "Duplicate task");
+		const res2 = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/different-resource.ics`,
+			{
+				body: ics2,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		expect(res2.status).toBe(409);
+		const text = await res2.text();
+		expect(text).toContain("Duplicate UID");
+	});
+
+	it("PUT update to same resource path (same UID) succeeds", async () => {
+		// Create a resource
+		const ics1 = makeVtodo("dup-uid-3", "Original");
+		const res1 = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/dup-uid-3.ics`,
+			{
+				body: ics1,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		expect(res1.status).toBe(201);
+
+		// Update the same resource (same URL, same UID)
+		const ics2 = makeVtodo("dup-uid-3", "Updated");
+		const res2 = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/dup-uid-3.ics`,
+			{
+				body: ics2,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		expect(res2.status).toBe(204);
+	});
+});
+
 describe("CalDAV edge cases", () => {
 	let calendarId: number;
 
@@ -1221,5 +1297,38 @@ describe("CalDAV edge cases", () => {
 			body,
 		});
 		expect(res.status).toBe(207);
+	});
+});
+
+// === Depth:infinity rejection ===
+
+describe("Depth:infinity rejection", () => {
+	let calendarId: number;
+	beforeAll(async () => {
+		calendarId = await seedCalendar("Depth Infinity Test", "VTODO");
+	});
+
+	it("PROPFIND with Depth:infinity returns 403", async () => {
+		const res = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			headers: { Depth: "infinity" },
+		});
+		expect(res.status).toBe(403);
+		const xml = await res.text();
+		expect(xml).toContain("propfind-finite-depth");
+	});
+
+	it("REPORT with Depth:infinity returns 403", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<d:sync-collection xmlns:d="DAV:">
+  <d:sync-token></d:sync-token>
+  <d:prop><d:getetag/></d:prop>
+</d:sync-collection>`;
+		const res = await request("REPORT", `/dav/projects/${calendarId}/`, {
+			body,
+			headers: { Depth: "infinity" },
+		});
+		expect(res.status).toBe(403);
+		const xml = await res.text();
+		expect(xml).toContain("propfind-finite-depth");
 	});
 });

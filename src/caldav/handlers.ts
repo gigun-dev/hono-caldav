@@ -5,9 +5,10 @@ import {
 	type CaldavUser,
 	authenticateBasicUser,
 } from "../auth/caldav-token.js";
-import { isValidComponent } from "./ical.js";
+import { extractUid, isValidComponent } from "./ical.js";
 import {
 	createCalendar,
+	deleteCalendar,
 	deleteObject,
 	getCalendarById,
 	getCalendarsForUser,
@@ -60,6 +61,23 @@ const DAV_HEADERS = {
 	DAV: "1, calendar-access, sync-collection, extended-mkcol",
 	Allow: "OPTIONS, PROPFIND, REPORT, GET, PUT, DELETE, PROPPATCH, MKCOL",
 };
+
+const PROPFIND_FINITE_DEPTH_ERROR = `<?xml version="1.0" encoding="utf-8"?>
+<d:error xmlns:d="DAV:">
+  <d:propfind-finite-depth/>
+</d:error>`;
+
+function rejectDepthInfinity(
+	c: Context<{ Bindings: CloudflareBindings }>,
+): Response | null {
+	const raw = c.req.header("depth");
+	if (raw?.toLowerCase() === "infinity") {
+		return c.body(PROPFIND_FINITE_DEPTH_ERROR, 403, {
+			"Content-Type": "application/xml; charset=utf-8",
+		});
+	}
+	return null;
+}
 
 function parseProppatchDisplayName(body: string): string | null {
 	const m = body.match(
@@ -227,6 +245,8 @@ export function registerCaldavRoutes(
 	const handleProjects = async (
 		c: Context<{ Bindings: CloudflareBindings }>,
 	) => {
+		const rejected = rejectDepthInfinity(c);
+		if (rejected) return rejected;
 		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
@@ -241,6 +261,8 @@ export function registerCaldavRoutes(
 	const handleProject = async (
 		c: Context<{ Bindings: CloudflareBindings }>,
 	) => {
+		const rejected = rejectDepthInfinity(c);
+		if (rejected) return rejected;
 		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
@@ -264,6 +286,8 @@ export function registerCaldavRoutes(
 	};
 
 	const handleReport = async (c: Context<{ Bindings: CloudflareBindings }>) => {
+		const rejected = rejectDepthInfinity(c);
+		if (rejected) return rejected;
 		const user = await requireAuth(c);
 		if (!user) {
 			return buildUnauthorizedResponse(c);
@@ -525,6 +549,26 @@ export function registerCaldavRoutes(
 	app.post("/dav/projects/:slug", handleMkcalendarProxy);
 	app.post("/dav/projects/:slug/", handleMkcalendarProxy);
 
+	// DELETE calendar collection
+	const handleDeleteCalendar = async (
+		c: Context<{ Bindings: CloudflareBindings }>,
+	) => {
+		const user = await requireAuth(c);
+		if (!user) {
+			return buildUnauthorizedResponse(c);
+		}
+		const calendarId = Number(c.req.param("projectId"));
+		const cal = await getCalendarById(c.env.DB, user.id, calendarId);
+		if (!cal) {
+			return c.text("Calendar not found", 404);
+		}
+		await deleteCalendar(c.env.DB, calendarId);
+		return c.body(null, 204);
+	};
+
+	app.delete("/dav/projects/:projectId", handleDeleteCalendar);
+	app.delete("/dav/projects/:projectId/", handleDeleteCalendar);
+
 	// GET single object
 	app.get("/dav/projects/:projectId/:uid", async (c) => {
 		const user = await requireAuth(c);
@@ -629,6 +673,20 @@ export function registerCaldavRoutes(
 			const existing = await getObjectByUid(c.env.DB, cal.id, uid);
 			if (existing) {
 				return c.text("Precondition Failed", 412);
+			}
+		}
+
+		// Duplicate UID rejection (RFC 4791): if creating a new resource,
+		// check that no other resource in this calendar has the same UID.
+		const existingByPath = await getObjectByUid(c.env.DB, cal.id, uid);
+		if (!existingByPath) {
+			// This is a new resource — check for UID conflict
+			const icsUid = extractUid(icsData);
+			if (icsUid) {
+				const conflicting = await getObjectByUid(c.env.DB, cal.id, icsUid);
+				if (conflicting && conflicting.uid !== uid) {
+					return c.text("Duplicate UID", 409);
+				}
 			}
 		}
 
