@@ -14,6 +14,13 @@ import { DashboardPage } from "./pages/dashboard.js";
 import { SetupPage } from "./pages/setup.js";
 import { generateMobileconfig } from "./setup/mobileconfig.js";
 import { handleMcpRequest } from "./mcp/handler.js";
+import {
+	handleAuthorize,
+	handleToken,
+	handleRevoke,
+	validateMcpToken,
+} from "./mcp/oauth.js";
+import { rateLimiter, defaultKeyGenerator } from "./middleware/rate-limit.js";
 import { processNaturalLanguage } from "./ai/natural-language.js";
 import {
 	createScheduledEvent,
@@ -86,6 +93,34 @@ app.use("/dav/*", async (c, next) => {
 		}));
 	}
 });
+
+// --- Rate limiting ---
+app.use(
+	"/dav/*",
+	rateLimiter({
+		windowMs: 60_000,
+		max: 100,
+		keyGenerator: defaultKeyGenerator("dav"),
+	}),
+);
+app.use(
+	"/api/*",
+	rateLimiter({
+		windowMs: 60_000,
+		max: 60,
+		keyGenerator: defaultKeyGenerator("api"),
+	}),
+);
+app.use("/mcp", rateLimiter({
+	windowMs: 60_000,
+	max: 30,
+	keyGenerator: defaultKeyGenerator("mcp"),
+}));
+app.use("/mcp/*", rateLimiter({
+	windowMs: 60_000,
+	max: 30,
+	keyGenerator: defaultKeyGenerator("mcp"),
+}));
 
 // --- better-auth routes ---
 app.on(["POST", "GET"], "/api/auth/**", (c) => {
@@ -221,17 +256,43 @@ app.post("/api/tasks/natural", authGuard, async (c) => {
 	return c.json(result);
 });
 
+// --- MCP OAuth endpoints ---
+app.get("/mcp/authorize", authGuard, handleAuthorize);
+app.post("/mcp/token", handleToken);
+app.post("/mcp/revoke", handleRevoke);
+
+// --- MCP OAuth well-known metadata (RFC 8414) ---
+app.get("/.well-known/oauth-authorization-server", (c) => {
+	const baseUrl = new URL(c.req.url);
+	const issuer = `${baseUrl.protocol}//${baseUrl.host}`;
+	return c.json({
+		issuer,
+		authorization_endpoint: `${issuer}/mcp/authorize`,
+		token_endpoint: `${issuer}/mcp/token`,
+		revocation_endpoint: `${issuer}/mcp/revoke`,
+		response_types_supported: ["code"],
+		grant_types_supported: ["authorization_code", "refresh_token"],
+		code_challenge_methods_supported: ["S256", "plain"],
+		token_endpoint_auth_methods_supported: ["none"],
+	});
+});
+
 // --- MCP endpoint (Streamable HTTP, JSON-RPC) ---
 app.all("/mcp", async (c) => {
 	const auth = c.req.header("Authorization");
-	if (
-		!auth?.startsWith("Bearer ") ||
-		!timingSafeEqualStr(auth.slice(7), c.env.MCP_TOKEN)
-	) {
-		return c.text("Unauthorized", 401);
+	if (!auth?.startsWith("Bearer ")) return c.text("Unauthorized", 401);
+	const token = auth.slice(7);
+
+	// Try legacy token first
+	if (c.env.MCP_TOKEN && timingSafeEqualStr(token, c.env.MCP_TOKEN)) {
+		const userId = c.env.MCP_USER_ID || "default";
+		return handleMcpRequest(c.req.raw, c.env.DB, userId, c.env);
 	}
-	const userId = c.env.MCP_USER_ID || "default";
-	return handleMcpRequest(c.req.raw, c.env.DB, userId, c.env);
+
+	// Try OAuth token
+	const result = await validateMcpToken(c.env.DB, token);
+	if (!result) return c.text("Unauthorized", 401);
+	return handleMcpRequest(c.req.raw, c.env.DB, result.userId, c.env);
 });
 
 // --- Webhook API ---

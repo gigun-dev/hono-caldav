@@ -18,8 +18,9 @@ export async function addAttendees(
 	calendarObjectId: number,
 	attendees: { email: string; partstat?: string; rsvp?: boolean }[],
 ): Promise<void> {
-	for (const att of attendees) {
-		await db
+	if (attendees.length === 0) return;
+	const stmts = attendees.map((att) =>
+		db
 			.prepare(
 				"INSERT OR IGNORE INTO attendees (calendar_object_id, email, partstat, rsvp) VALUES (?, ?, ?, ?)",
 			)
@@ -28,9 +29,9 @@ export async function addAttendees(
 				att.email.toLowerCase(),
 				att.partstat ?? "NEEDS-ACTION",
 				att.rsvp !== false ? 1 : 0,
-			)
-			.run();
-	}
+			),
+	);
+	await db.batch(stmts);
 }
 
 export async function getAttendees(
@@ -52,22 +53,13 @@ export async function updatePartstat(
 	email: string,
 	partstat: string,
 ): Promise<boolean> {
-	// Check if the attendee exists first
-	const existing = await db
-		.prepare(
-			"SELECT id FROM attendees WHERE calendar_object_id = ? AND email = ?",
-		)
-		.bind(calendarObjectId, email.toLowerCase())
-		.first();
-	if (!existing) return false;
-
-	await db
+	const result = await db
 		.prepare(
 			"UPDATE attendees SET partstat = ?, replied_at = datetime('now') WHERE calendar_object_id = ? AND email = ?",
 		)
 		.bind(partstat, calendarObjectId, email.toLowerCase())
 		.run();
-	return true;
+	return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function markSent(
