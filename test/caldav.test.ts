@@ -896,6 +896,70 @@ describe("ETag SHA-256", () => {
 		const getEtag = getRes.headers.get("ETag");
 		expect(getEtag).toBe(putEtag);
 	});
+
+	it("GET with matching If-None-Match returns 304", async () => {
+		const ics = makeVtodo("etag-304-test", "304 Test");
+		const putRes = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/etag-304-test.ics`,
+			{
+				body: ics,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		const etag = putRes.headers.get("ETag")!;
+
+		const getRes = await request(
+			"GET",
+			`/dav/projects/${calendarId}/etag-304-test.ics`,
+			{ headers: { "If-None-Match": etag } },
+		);
+		expect(getRes.status).toBe(304);
+		expect(getRes.headers.get("ETag")).toBe(etag);
+		const body = await getRes.text();
+		expect(body).toBe("");
+	});
+
+	it("GET with non-matching If-None-Match returns 200 with body", async () => {
+		const ics = makeVtodo("etag-200-test", "200 Test");
+		await request(
+			"PUT",
+			`/dav/projects/${calendarId}/etag-200-test.ics`,
+			{
+				body: ics,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+
+		const getRes = await request(
+			"GET",
+			`/dav/projects/${calendarId}/etag-200-test.ics`,
+			{ headers: { "If-None-Match": '"stale-etag"' } },
+		);
+		expect(getRes.status).toBe(200);
+		const body = await getRes.text();
+		expect(body).toContain("VTODO");
+	});
+
+	it("GET without If-None-Match returns 200 with body", async () => {
+		const ics = makeVtodo("etag-no-inm", "No INM Test");
+		await request(
+			"PUT",
+			`/dav/projects/${calendarId}/etag-no-inm.ics`,
+			{
+				body: ics,
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+
+		const getRes = await request(
+			"GET",
+			`/dav/projects/${calendarId}/etag-no-inm.ics`,
+		);
+		expect(getRes.status).toBe(200);
+		const body = await getRes.text();
+		expect(body).toContain("VTODO");
+	});
 });
 
 // === 14. CalDAV edge cases ===
@@ -1522,6 +1586,35 @@ describe("DELETE calendar collection", () => {
 	it("DELETE on non-existent calendar returns 404", async () => {
 		const res = await request("DELETE", "/dav/projects/99999/");
 		expect(res.status).toBe(404);
+	});
+});
+
+// === Edge case coverage ===
+
+describe("Edge case coverage", () => {
+	it("Cross-user calendar access via DELETE returns 404", async () => {
+		const calendarId = await seedCalendar(
+			"cross-user-delete-test",
+			"VTODO",
+		);
+		const ics = makeVtodo("cross-user-obj", "Cross user task");
+		await request("PUT", `/dav/projects/${calendarId}/cross-user-obj.ics`, {
+			body: ics,
+			headers: { "Content-Type": "text/calendar" },
+		});
+
+		// Try to DELETE with a different user's credentials
+		const AUTH_OTHER = "Basic " + btoa("other-user:other-pass");
+		const res = await SELF.fetch(
+			`http://localhost/dav/projects/${calendarId}/`,
+			{
+				method: "DELETE",
+				headers: { Authorization: AUTH_OTHER },
+			},
+		);
+
+		// Should be 404 (calendar not found for that user) or 401 (auth failure)
+		expect([401, 404]).toContain(res.status);
 	});
 });
 

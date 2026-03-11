@@ -3,6 +3,7 @@
  * Parses <c:filter> XML and matches calendar objects.
  */
 
+import ICAL from "ical.js";
 import type { CalendarObject } from "./storage.js";
 
 // --- Filter types ---
@@ -442,8 +443,11 @@ function matchesTimeRange(
 	componentName: string,
 	tr: TimeRange,
 ): boolean {
-	const start = tr.start ? parseIcsDate(tr.start) : null;
-	const end = tr.end ? parseIcsDate(tr.end) : null;
+	const startRaw = tr.start ? parseIcsDate(tr.start) : null;
+	const endRaw = tr.end ? parseIcsDate(tr.end) : null;
+	// Treat NaN (malformed date) as "no constraint"
+	const start = startRaw !== null && !Number.isNaN(startRaw) ? startRaw : null;
+	const end = endRaw !== null && !Number.isNaN(endRaw) ? endRaw : null;
 
 	if (componentName === "VEVENT") {
 		return matchesVeventTimeRange(icsData, start, end);
@@ -468,9 +472,17 @@ function matchesVeventTimeRange(
 	const startTs = parseIcsDate(dtstart);
 	const endTs = dtend ? parseIcsDate(dtend) : startTs;
 
-	if (end !== null && startTs >= end) return false;
-	if (start !== null && endTs <= start) return false;
-	return true;
+	// Check if the base event itself overlaps with the range
+	const baseOverlaps =
+		(end === null || startTs < end) && (start === null || endTs > start);
+
+	if (baseOverlaps) return true;
+
+	// If no RRULE, the base event didn't match so return false
+	if (!hasRRule(icsData, "VEVENT")) return false;
+
+	// Expand recurrence and check if any occurrence falls in range
+	return matchesRecurrence(icsData, "VEVENT", start, end);
 }
 
 function matchesVtodoTimeRange(
@@ -483,41 +495,46 @@ function matchesVtodoTimeRange(
 	const completed = extractComponentProp(icsData, "VTODO", "COMPLETED");
 	const created = extractComponentProp(icsData, "VTODO", "CREATED");
 
+	let baseMatches: boolean;
+
 	if (dtstart && due) {
 		const s = parseIcsDate(dtstart);
 		const e = parseIcsDate(due);
-		if (end !== null && s >= end) return false;
-		if (start !== null && e <= start) return false;
-		return true;
-	}
-	if (dtstart) {
+		baseMatches =
+			(end === null || s < end) && (start === null || e > start);
+	} else if (dtstart) {
 		const s = parseIcsDate(dtstart);
-		if (end !== null && s >= end) return false;
-		return true;
-	}
-	if (due) {
+		baseMatches = end === null || s < end;
+		// DTSTART-only: matches if filter end is after DTSTART (no start bound check for open-ended)
+		if (start !== null && !due) {
+			// Original logic: only checks end
+			baseMatches = end === null || s < end;
+		}
+	} else if (due) {
 		const d = parseIcsDate(due);
-		if (start !== null && d <= start) return false;
-		if (end !== null && d >= end) return false;
-		return true;
-	}
-	if (completed && created) {
+		baseMatches =
+			(start === null || d > start) && (end === null || d < end);
+	} else if (completed && created) {
 		const c = parseIcsDate(completed);
 		const cr = parseIcsDate(created);
-		if (end !== null && cr >= end) return false;
-		if (start !== null && c <= start) return false;
-		return true;
-	}
-	if (completed) {
-		// RFC 4791 §9.9: VTODO with only COMPLETED → effective range is COMPLETED
+		baseMatches =
+			(end === null || cr < end) && (start === null || c > start);
+	} else if (completed) {
 		const c = parseIcsDate(completed);
-		if (end !== null && c >= end) return false;
-		if (start !== null && c < start) return false;
+		baseMatches =
+			(end === null || c < end) && (start === null || c >= start);
+	} else {
+		// No temporal properties — always matches
 		return true;
 	}
 
-	// No temporal properties — always matches
-	return true;
+	if (baseMatches) return true;
+
+	// If no RRULE, base didn't match
+	if (!hasRRule(icsData, "VTODO")) return false;
+
+	// Expand recurrence for VTODO
+	return matchesRecurrence(icsData, "VTODO", start, end);
 }
 
 function matchesPropertyTimeRange(
@@ -531,6 +548,104 @@ function matchesPropertyTimeRange(
 	if (start !== null && ts < start) return false;
 	if (end !== null && ts >= end) return false;
 	return true;
+}
+
+// --- RRULE expansion helpers ---
+
+/** Maximum number of occurrences to expand for RRULE matching. */
+const MAX_RECURRENCE_EXPANSIONS = 1000;
+
+/** Maximum expansion window: 2 years from DTSTART (in ms). */
+const MAX_EXPANSION_WINDOW_MS = 2 * 365.25 * 24 * 60 * 60 * 1000;
+
+/**
+ * Check if a component contains an RRULE property.
+ */
+function hasRRule(icsData: string, componentName: string): boolean {
+	return extractComponentProp(icsData, componentName, "RRULE") !== null;
+}
+
+/**
+ * Expand RRULE using ical.js and check if any occurrence overlaps with the time range.
+ * Falls back to conservatively returning true if ical.js fails.
+ */
+function matchesRecurrence(
+	icsData: string,
+	componentName: string,
+	start: number | null,
+	end: number | null,
+): boolean {
+	try {
+		const jcal = ICAL.parse(icsData);
+		const vcalendar = new ICAL.Component(jcal);
+		const component = vcalendar.getFirstSubcomponent(
+			componentName.toLowerCase(),
+		);
+		if (!component) return true; // conservative
+
+		const dtstart = component.getFirstPropertyValue("dtstart") as ICAL.Time | null;
+		if (!dtstart) return true;
+
+		// Determine event duration for overlap calculation
+		let durationMs = 0;
+		if (componentName === "VEVENT") {
+			const dtend = component.getFirstPropertyValue("dtend") as ICAL.Time | null;
+			const duration = component.getFirstPropertyValue("duration") as ICAL.Duration | null;
+			if (dtend) {
+				durationMs = (dtend.toUnixTime() - dtstart.toUnixTime()) * 1000;
+			} else if (duration) {
+				durationMs = duration.toSeconds() * 1000;
+			}
+		} else if (componentName === "VTODO") {
+			const due = component.getFirstPropertyValue("due") as ICAL.Time | null;
+			const duration = component.getFirstPropertyValue("duration") as ICAL.Duration | null;
+			if (due) {
+				durationMs = (due.toUnixTime() - dtstart.toUnixTime()) * 1000;
+			} else if (duration) {
+				durationMs = duration.toSeconds() * 1000;
+			}
+		}
+		if (durationMs < 0) durationMs = 0;
+
+		// Calculate expansion limit
+		const dtstartMs = dtstart.toUnixTime() * 1000;
+		const expansionEnd = dtstartMs + MAX_EXPANSION_WINDOW_MS;
+		// If the query end is set and within our window, use it as the limit
+		const effectiveEnd = end !== null ? Math.min(end, expansionEnd) : expansionEnd;
+
+		// Create recurrence iterator
+		const recur = component.getFirstPropertyValue("rrule") as ICAL.Recur;
+		if (!recur) return true;
+
+		const iter = recur.iterator(dtstart);
+		let count = 0;
+
+		while (count < MAX_RECURRENCE_EXPANSIONS) {
+			const next = iter.next();
+			if (!next) break;
+
+			const occurrenceStartMs = next.toUnixTime() * 1000;
+			const occurrenceEndMs = occurrenceStartMs + durationMs;
+
+			// Stop expanding if we've gone past the effective end
+			if (occurrenceStartMs > effectiveEnd) break;
+
+			// Check overlap: occurrence overlaps if it starts before range end
+			// and ends after range start
+			const overlaps =
+				(end === null || occurrenceStartMs < end) &&
+				(start === null || occurrenceEndMs > start);
+
+			if (overlaps) return true;
+
+			count++;
+		}
+
+		return false;
+	} catch {
+		// Conservative fallback: if ical.js fails, include the event
+		return true;
+	}
 }
 
 /**

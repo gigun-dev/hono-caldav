@@ -90,6 +90,39 @@
 ### 4.3 COUNTER 自動 ACCEPT
 - [ ] `/api/scheduling/counter` に COUNTER POST → 時間変更が自動適用
 
+## Phase 5a: CalDAV RFC 完全準拠
+
+### 5a.1 Calendar-Query Filter
+- [ ] iOS リマインダーで「未完了タスクのみ」表示 → REPORT calendar-query で comp-filter VTODO + prop-filter が送信される
+- [ ] Proxyman: `<c:comp-filter name="VTODO">` を含む REPORT リクエスト確認
+- [ ] wrangler logs: フィルタ適用ログ（DEBUG=true 時）
+
+### 5a.2 Depth:infinity 拒否
+- [ ] Proxyman: もし Depth:infinity リクエストがあれば 403 レスポンスを確認
+- [ ] iOS クライアントは通常 Depth:0 or 1 を使うため、発生しない可能性が高い
+
+### 5a.3 非 ASCII コンテンツ
+- [ ] 日本語タイトルのタスク作成 → GET で正しく返る
+- [ ] 絵文字付きタスク作成 → GET で正しく返る
+- [ ] 同期で日本語タスクが正しく表示される
+
+### 5a.4 カレンダー削除
+- [ ] iOS カレンダーアプリからカレンダーを削除 → DELETE リクエスト確認
+- [ ] 削除後、カレンダーとタスクがすべて消える
+
+### 5a.5 Duplicate UID 拒否
+- [ ] 通常の iOS 操作では発生しない（iOS は一意の UID を生成する）
+- [ ] API テストのみ: 同一 UID で別リソースに PUT → 409
+
+## Phase 6b: 監視
+
+### 6b.1 ヘルスチェック
+- [ ] `curl http://localhost:8787/health` → `{"status":"ok","db":"connected"}`
+
+### 6b.2 構造化ログ
+- [ ] `DEBUG=true` で `bun run dev` → CalDAV リクエストが JSON 形式でログ出力
+- [ ] requestId, durationMs, status がログに含まれる
+
 ## 確認ポイント (Proxyman)
 
 ### 注目すべきヘッダー

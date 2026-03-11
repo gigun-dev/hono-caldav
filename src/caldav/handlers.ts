@@ -590,6 +590,12 @@ export function registerCaldavRoutes(
 		if (!obj) {
 			return c.text("Object not found", 404);
 		}
+		const ifNoneMatch = c.req.header("if-none-match");
+		if (ifNoneMatch && ifNoneMatch === obj.etag) {
+			return c.body(null, 304, {
+				ETag: obj.etag,
+			});
+		}
 		return c.text(obj.icsData, 200, {
 			ETag: obj.etag,
 			"Content-Type": "text/calendar; charset=utf-8",

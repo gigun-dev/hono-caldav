@@ -439,3 +439,161 @@ describe("applyFilter - VTODO time-range edge cases", () => {
 		expect(applyFilter(objects, filter).length).toBe(1);
 	});
 });
+
+describe("Edge cases", () => {
+	it("malformed date in time-range still includes undated VTODOs", () => {
+		// Undated VTODOs always return true before any date comparison,
+		// so malformed filter dates don't affect them
+		const objects = [makeObj("todo-1", VTODO_ICS)];
+		const filter = parseCalendarFilter(`<c:filter>
+  <c:comp-filter name="VCALENDAR">
+    <c:comp-filter name="VTODO">
+      <c:time-range start="invalid" end="also-invalid"/>
+    </c:comp-filter>
+  </c:comp-filter>
+</c:filter>`)!;
+		expect(filter.compFilters[0].timeRange).toBeDefined();
+		expect(filter.compFilters[0].timeRange!.start).toBe("invalid");
+		const result = applyFilter(objects, filter);
+		expect(result.length).toBe(1);
+	});
+
+	it("empty filter body returns null", () => {
+		const result = parseCalendarFilter("");
+		expect(result).toBeNull();
+	});
+
+	it("filter with only VCALENDAR and no inner filters returns all objects", () => {
+		const objects = [
+			makeObj("todo-1", VTODO_ICS),
+			makeObj("event-1", VEVENT_ICS),
+			makeObj("todo-done", COMPLETED_TODO),
+		];
+		const filter = parseCalendarFilter(`<c:filter>
+  <c:comp-filter name="VCALENDAR"/>
+</c:filter>`)!;
+		const result = applyFilter(objects, filter);
+		expect(result.length).toBe(3);
+	});
+
+	it("VEVENT with DURATION instead of DTEND falls back to DTSTART for end (in range)", () => {
+		const VEVENT_DURATION = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:event-dur\r\nSUMMARY:Duration event\r\nDTSTART:20260315T100000Z\r\nDURATION:PT1H\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+		const objects = [makeObj("event-dur", VEVENT_DURATION)];
+
+		// Filter range that includes DTSTART — should match
+		// Since there's no DTEND, endTs falls back to startTs (DTSTART)
+		const filter = parseCalendarFilter(`<c:filter>
+  <c:comp-filter name="VCALENDAR">
+    <c:comp-filter name="VEVENT">
+      <c:time-range start="20260301T000000Z" end="20260401T000000Z"/>
+    </c:comp-filter>
+  </c:comp-filter>
+</c:filter>`)!;
+		expect(applyFilter(objects, filter).length).toBe(1);
+	});
+});
+
+// --- RRULE recurrence expansion tests ---
+
+describe("applyFilter - RRULE recurrence expansion", () => {
+	// Daily recurring event starting Jan 1, 1-hour duration
+	const DAILY_RRULE_VEVENT = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:daily-event\r\nSUMMARY:Daily standup\r\nDTSTART:20260101T090000Z\r\nDTEND:20260101T100000Z\r\nRRULE:FREQ=DAILY\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+
+	// Weekly event with COUNT=4 starting Jan 5 (Mon), 4 occurrences total
+	const WEEKLY_COUNT_VEVENT = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:weekly-limited\r\nSUMMARY:Weekly sync\r\nDTSTART:20260105T140000Z\r\nDTEND:20260105T150000Z\r\nRRULE:FREQ=WEEKLY;COUNT=4\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+	// Occurrences: Jan 5, Jan 12, Jan 19, Jan 26
+
+	// Recurring VTODO with daily RRULE starting March 1
+	const DAILY_RRULE_VTODO = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\nUID:daily-todo\r\nSUMMARY:Daily review\r\nDTSTART:20260301T080000Z\r\nDUE:20260301T090000Z\r\nRRULE:FREQ=DAILY\r\nEND:VTODO\r\nEND:VCALENDAR`;
+
+	it("VEVENT with daily RRULE: occurrence in range matches", () => {
+		const objects = [makeObj("daily-event", DAILY_RRULE_VEVENT)];
+		const filter = parseCalendarFilter(`<c:filter>
+  <c:comp-filter name="VCALENDAR">
+    <c:comp-filter name="VEVENT">
+      <c:time-range start="20260301T000000Z" end="20260401T000000Z"/>
+    </c:comp-filter>
+  </c:comp-filter>
+</c:filter>`)!;
+		const result = applyFilter(objects, filter);
+		expect(result.length).toBe(1);
+	});
+
+	it("VEVENT with daily RRULE: no occurrence in range doesn't match", () => {
+		const objects = [makeObj("daily-event", DAILY_RRULE_VEVENT)];
+		const filter = parseCalendarFilter(`<c:filter>
+  <c:comp-filter name="VCALENDAR">
+    <c:comp-filter name="VEVENT">
+      <c:time-range start="20251201T000000Z" end="20251231T000000Z"/>
+    </c:comp-filter>
+  </c:comp-filter>
+</c:filter>`)!;
+		const result = applyFilter(objects, filter);
+		expect(result.length).toBe(0);
+	});
+
+	it("VEVENT with weekly RRULE and COUNT: matches within limited occurrences", () => {
+		const objects = [makeObj("weekly-limited", WEEKLY_COUNT_VEVENT)];
+		const filter = parseCalendarFilter(`<c:filter>
+  <c:comp-filter name="VCALENDAR">
+    <c:comp-filter name="VEVENT">
+      <c:time-range start="20260119T000000Z" end="20260120T000000Z"/>
+    </c:comp-filter>
+  </c:comp-filter>
+</c:filter>`)!;
+		const result = applyFilter(objects, filter);
+		expect(result.length).toBe(1);
+	});
+
+	it("VEVENT with weekly RRULE and COUNT: no match after last occurrence", () => {
+		const objects = [makeObj("weekly-limited", WEEKLY_COUNT_VEVENT)];
+		const filter = parseCalendarFilter(`<c:filter>
+  <c:comp-filter name="VCALENDAR">
+    <c:comp-filter name="VEVENT">
+      <c:time-range start="20260201T000000Z" end="20260301T000000Z"/>
+    </c:comp-filter>
+  </c:comp-filter>
+</c:filter>`)!;
+		const result = applyFilter(objects, filter);
+		expect(result.length).toBe(0);
+	});
+
+	it("VTODO with RRULE: matches if any occurrence in range", () => {
+		const objects = [makeObj("daily-todo", DAILY_RRULE_VTODO)];
+		const filter = parseCalendarFilter(`<c:filter>
+  <c:comp-filter name="VCALENDAR">
+    <c:comp-filter name="VTODO">
+      <c:time-range start="20260401T000000Z" end="20260501T000000Z"/>
+    </c:comp-filter>
+  </c:comp-filter>
+</c:filter>`)!;
+		const result = applyFilter(objects, filter);
+		expect(result.length).toBe(1);
+	});
+
+	it("VTODO with RRULE: no match before recurrence starts", () => {
+		const objects = [makeObj("daily-todo", DAILY_RRULE_VTODO)];
+		const filter = parseCalendarFilter(`<c:filter>
+  <c:comp-filter name="VCALENDAR">
+    <c:comp-filter name="VTODO">
+      <c:time-range start="20260101T000000Z" end="20260201T000000Z"/>
+    </c:comp-filter>
+  </c:comp-filter>
+</c:filter>`)!;
+		const result = applyFilter(objects, filter);
+		expect(result.length).toBe(0);
+	});
+
+	it("VEVENT without RRULE still works normally (no regression)", () => {
+		const objects = [makeObj("event-1", VEVENT_ICS)];
+		const filter = parseCalendarFilter(`<c:filter>
+  <c:comp-filter name="VCALENDAR">
+    <c:comp-filter name="VEVENT">
+      <c:time-range start="20260101T000000Z" end="20260201T000000Z"/>
+    </c:comp-filter>
+  </c:comp-filter>
+</c:filter>`)!;
+		const result = applyFilter(objects, filter);
+		expect(result.length).toBe(0);
+	});
+});

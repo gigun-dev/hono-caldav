@@ -1,12 +1,17 @@
 # Phase 5+ 計画草案
 
-## 現状 (Phase 1-4 完了時点)
+## 現状 (Phase 5a + 6b 完了時点)
 
-- CalDAV Server: RFC 4791 基本準拠、iOS/Android/Thunderbird 対応
+- CalDAV Server: RFC 4791 準拠 (calendar-query filter, Depth:infinity 拒否, Duplicate UID 拒否)
 - 認証: better-auth + Google OAuth + App Password + MCP Bearer token
 - AI: Workers AI 自然言語 CRUD + Gmail タスク抽出
 - Scheduling: iTIP/iMIP (SaaS as Organizer)
-- テスト: 216テスト / 11ファイル
+- 監視: /health エンドポイント + 構造化 JSON ログ
+- テスト: 259+テスト / 12ファイル
+
+### 完了した Phase
+- **Phase 5a** ✅ calendar-query filter (comp/prop/time-range/text-match), Duplicate UID 拒否, Depth:infinity, 非 ASCII, カレンダー削除
+- **Phase 6b** ✅ /health エンドポイント, 構造化ログ (requestId, durationMs)
 
 ---
 
