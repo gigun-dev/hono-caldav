@@ -82,6 +82,37 @@ export async function getCalendarById(
 	return row ? rowToCalendar(row) : null;
 }
 
+export async function getCalendarByIdWithSharing(
+	db: D1Database,
+	userId: string,
+	calendarId: number,
+): Promise<{ calendar: Calendar; permission: "owner" | "read" | "read-write" } | null> {
+	// First check if user owns the calendar
+	const owned = await getCalendarById(db, userId, calendarId);
+	if (owned) {
+		return { calendar: owned, permission: "owner" };
+	}
+
+	// Check if calendar is shared with the user
+	const row = await db
+		.prepare(
+			`SELECT c.id, c.user_id, c.name, c.component_type, c.ctag, c.synctoken, c.color, c.calendar_order, c.created_at, c.updated_at,
+				cs.permission
+			FROM calendars c
+			JOIN calendar_shares cs ON c.id = cs.calendar_id
+			WHERE c.id = ? AND cs.shared_with = ?`,
+		)
+		.bind(calendarId, userId)
+		.first();
+	if (!row) return null;
+
+	const permission = row.permission as string;
+	return {
+		calendar: rowToCalendar(row as Record<string, unknown>),
+		permission: permission === "read-write" ? "read-write" : "read",
+	};
+}
+
 export async function createCalendar(
 	db: D1Database,
 	userId: string,

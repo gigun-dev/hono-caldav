@@ -154,6 +154,21 @@
 
 ---
 
+## Phase 7c: Calendar Sharing
+
+### Features
+- Calendar sharing API (share/list/revoke)
+- Per-user shared calendar listing
+- Ownership verification (IDOR prevention)
+- UNIQUE constraint for duplicate share prevention
+
+### Files Added
+- `src/sharing/api.ts` — Sharing CRUD
+- `migrations/0009_calendar_shares.sql` — calendar_shares table
+- `test/sharing.test.ts` — 9 tests
+
+---
+
 ## Security Hardening (across multiple commits)
 
 - PBKDF2 password hashing (replaced SHA-256)
@@ -185,5 +200,6 @@
 | mobileconfig.test.ts | 9 | Plist structure, XSS escaping |
 | natural-language-e2e.test.ts | 9 | ICS escaping, edge cases |
 | webhooks.test.ts | TBD | Webhook CRUD, HMAC signing, event delivery |
+| sharing.test.ts | 9 | Calendar sharing API, ownership, IDOR, duplicate prevention |
 | email-sender.test.ts | 4 | Resend API mock |
-| **Total** | **292+** | |
+| **Total** | **304+** | |

@@ -50,6 +50,8 @@ src/
 │   └── gmail-worker.ts      # Gmail polling pipeline
 ├── webhooks/
 │   └── notify.ts            # Webhook 通知 (HMAC-SHA256 署名)
+├── sharing/
+│   └── api.ts               # カレンダー共有 API (share/list/revoke)
 ├── setup/
 │   └── mobileconfig.ts      # iOS mobileconfig 生成
 └── pages/
@@ -76,7 +78,9 @@ src/
 - `gmail_sync_state` — Gmail polling 状態
 - `webhooks` — Webhook 登録 (url, secret, event_types, active)
 
-マイグレーションは `migrations/` ディレクトリ (0001-0008)。
+- `calendar_shares` — カレンダー共有 (calendar_id, owner_id, shared_with_id, permission)
+
+マイグレーションは `migrations/` ディレクトリ (0001-0009)。
 
 ### 同期方式
 
@@ -89,7 +93,7 @@ sync-token はカレンダーごとの整数カウンタ。
 - TypeScript strict モード
 - `.js` 拡張子付きインポート (`./storage.js`)
 - Hono の型: `Hono<{ Bindings: CloudflareBindings }>`
-- テストは `test/` ディレクトリ、`SELF.fetch()` でインテグレーションテスト (292+ テスト / 13 ファイル)
+- テストは `test/` ディレクトリ、`SELF.fetch()` でインテグレーションテスト (304+ テスト / 14 ファイル)
 
 ## 主要機能
 
@@ -102,6 +106,7 @@ sync-token はカレンダーごとの整数カウンタ。
 - Duplicate UID 拒否 (409 Conflict)
 - Depth:infinity 拒否 (403 Forbidden)
 - Webhook 通知 (HMAC-SHA256 署名、タスク作成/更新/完了/削除)
+- カレンダー共有 (share/list/revoke、IDOR 防止)
 - `/health` エンドポイント (D1 接続確認)
 - MCP Server (10 tools, JSON-RPC)
 - Workers AI 自然言語 CRUD

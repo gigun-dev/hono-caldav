@@ -8,13 +8,14 @@
 - Scheduling: iTIP/iMIP (SaaS as Organizer)
 - Webhook: HMAC-SHA256 署名付き通知
 - 監視: /health エンドポイント + 構造化 JSON ログ
-- テスト: 292+テスト / 13ファイル
+- テスト: 304+テスト / 14ファイル
 
 ### 完了した Phase
 - **Phase 5a** ✅ calendar-query filter (comp/prop/time-range/text-match), Duplicate UID 拒否, Depth:infinity, 非 ASCII, カレンダー削除
 - **Phase 5c** ✅ RRULE 繰り返しイベント展開 (time-range クエリ内)
 - **Phase 6b** ✅ /health エンドポイント, 構造化ログ (requestId, durationMs)
 - **Phase 7b** ✅ Webhook 通知 (HMAC-SHA256, タスク CRUD イベント)
+- **Phase 7c** ✅ カレンダー共有 (share/list/revoke, IDOR 防止)
 
 ---
 
@@ -154,10 +155,12 @@ Claude Desktop 等から動的にユーザー認証できるようになる。
 - HMAC-SHA256 署名付きリクエスト
 - Per-user webhook 登録・管理
 
-### 7c: カレンダー共有 — 未着手
+### 7c: カレンダー共有 ✅ 完了
 
-- CalendarServer Sharing Extensions
-- invite/allowed-sharing-modes
+- Calendar sharing API (share/list/revoke)
+- Per-user shared calendar listing
+- Ownership verification (IDOR prevention)
+- UNIQUE constraint for duplicate share prevention
 
 ---
 
@@ -174,4 +177,4 @@ Claude Desktop 等から動的にユーザー認証できるようになる。
 | 6c | マルチテナント | 高 | 低 (初期) | 未着手 |
 | 7a | CalDAV Client SDK | 中 | 中 | 未着手 |
 | 7b | Webhook 通知 | 中 | 中 | ✅ 完了 |
-| 7c | カレンダー共有 | 中 | 中 | 未着手 |
+| 7c | カレンダー共有 | 中 | 中 | ✅ 完了 |

@@ -11,6 +11,7 @@ import {
 	deleteCalendar,
 	deleteObject,
 	getCalendarById,
+	getCalendarByIdWithSharing,
 	getCalendarsForUser,
 	getChangesSince,
 	getObjectByUid,
@@ -255,7 +256,7 @@ export function registerCaldavRoutes(
 		const depth = getDepthHeader(c.req.header("depth"));
 		const read = await readBodyWithLimit(c);
 		const filter = parsePropFilter("error" in read ? "" : read.body);
-		const calendars = await getCalendarsForUser(c.env.DB, user.id);
+		const calendars = await getCalendarsForUser(c.env.DB, user.id, true);
 		return buildCalendarCollectionResponse(c, user, calendars, depth, filter);
 	};
 
@@ -271,14 +272,15 @@ export function registerCaldavRoutes(
 		const depth = getDepthHeader(c.req.header("depth"));
 		const read = await readBodyWithLimit(c);
 		const filter = parsePropFilter("error" in read ? "" : read.body);
-		const cal = await getCalendarById(
+		const result = await getCalendarByIdWithSharing(
 			c.env.DB,
 			user.id,
 			Number(c.req.param("projectId")),
 		);
-		if (!cal) {
+		if (!result) {
 			return c.text("Calendar not found", 404);
 		}
+		const cal = result.calendar;
 
 		// ETag/If-None-Match caching using calendar ctag
 		const calEtag = `"${cal.ctag}"`;
@@ -317,14 +319,15 @@ export function registerCaldavRoutes(
 			body.match(/<sync-token>([^<]+)<\/sync-token>/i);
 		const requestSyncToken = syncTokenMatch?.[1];
 
-		const cal = await getCalendarById(
+		const reportResult = await getCalendarByIdWithSharing(
 			c.env.DB,
 			user.id,
 			Number(c.req.param("projectId")),
 		);
-		if (!cal) {
+		if (!reportResult) {
 			return c.text("Calendar not found", 404);
 		}
+		const cal = reportResult.calendar;
 
 		const currentSyncToken = String(cal.synctoken);
 
@@ -443,10 +446,14 @@ export function registerCaldavRoutes(
 		const color = parseProppatchCalendarColor(read.body);
 		const order = parseProppatchCalendarOrder(read.body);
 
-		let cal = await getCalendarById(c.env.DB, user.id, calendarId);
-		if (!cal) {
+		const ppResult = await getCalendarByIdWithSharing(c.env.DB, user.id, calendarId);
+		if (!ppResult) {
 			return c.text("Calendar not found", 404);
 		}
+		if (ppResult.permission === "read") {
+			return c.text("Forbidden", 403);
+		}
+		let cal = ppResult.calendar;
 
 		if (displayName !== null) {
 			cal = await updateCalendarDisplayName(
@@ -587,14 +594,15 @@ export function registerCaldavRoutes(
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
-		const cal = await getCalendarById(
+		const getResult = await getCalendarByIdWithSharing(
 			c.env.DB,
 			user.id,
 			Number(c.req.param("projectId")),
 		);
-		if (!cal) {
+		if (!getResult) {
 			return c.text("Calendar not found", 404);
 		}
+		const cal = getResult.calendar;
 		const uid = normalizeUidParam(c.req.param("uid"));
 		if (!uid) {
 			return c.text("Object not found", 404);
@@ -623,14 +631,15 @@ export function registerCaldavRoutes(
 		}
 		const read = await readBodyWithLimit(c);
 		const filter = parsePropFilter("error" in read ? "" : read.body);
-		const cal = await getCalendarById(
+		const pfResult = await getCalendarByIdWithSharing(
 			c.env.DB,
 			user.id,
 			Number(c.req.param("projectId")),
 		);
-		if (!cal) {
+		if (!pfResult) {
 			return c.text("Calendar not found", 404);
 		}
+		const cal = pfResult.calendar;
 		const uid = normalizeUidParam(c.req.param("uid"));
 		if (!uid) {
 			return c.text("Object not found", 404);
@@ -654,14 +663,18 @@ export function registerCaldavRoutes(
 		}
 		const icsData = read.body;
 
-		const cal = await getCalendarById(
+		const putResult = await getCalendarByIdWithSharing(
 			c.env.DB,
 			user.id,
 			Number(c.req.param("projectId")),
 		);
-		if (!cal) {
+		if (!putResult) {
 			return c.text("Calendar not found", 404);
 		}
+		if (putResult.permission === "read") {
+			return c.text("Forbidden", 403);
+		}
+		const cal = putResult.calendar;
 
 		if (!isValidComponent(icsData, cal.componentType)) {
 			return c.text(`Invalid ${cal.componentType}`, 400);
@@ -735,14 +748,18 @@ export function registerCaldavRoutes(
 		if (!user) {
 			return buildUnauthorizedResponse(c);
 		}
-		const cal = await getCalendarById(
+		const delResult = await getCalendarByIdWithSharing(
 			c.env.DB,
 			user.id,
 			Number(c.req.param("projectId")),
 		);
-		if (!cal) {
+		if (!delResult) {
 			return c.text("Calendar not found", 404);
 		}
+		if (delResult.permission === "read") {
+			return c.text("Forbidden", 403);
+		}
+		const cal = delResult.calendar;
 		const uid = normalizeUidParam(c.req.param("uid"));
 		if (!uid) {
 			return c.text("Object not found", 404);

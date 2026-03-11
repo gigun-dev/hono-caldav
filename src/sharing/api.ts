@@ -24,6 +24,9 @@ export async function shareCalendar(
 	sharedWith: string,
 	permission: string = "read",
 ): Promise<CalendarShare | null> {
+	// Prevent self-sharing
+	if (ownerId === sharedWith) return null;
+
 	// Verify calendar ownership
 	const cal = await db
 		.prepare("SELECT id FROM calendars WHERE id = ? AND user_id = ?")
@@ -106,48 +109,29 @@ export async function getSharedCalendars(
 		permission: string;
 	}>
 > {
-	// Look up by user_id or email
+	// Single query with JOIN to avoid N+1
 	const result = await db
 		.prepare(
-			`SELECT cs.id AS share_id, c.id AS calendar_id, c.name AS calendar_name,
-				c.component_type, cs.permission, cs.owner_id
+			`SELECT cs.id AS share_id, cs.calendar_id, cs.owner_id, cs.shared_with, cs.permission, cs.created_at,
+				c.name AS calendar_name, c.component_type,
+				u.email AS owner_email, u.name AS owner_name
 			FROM calendar_shares cs
 			JOIN calendars c ON cs.calendar_id = c.id
+			LEFT JOIN "user" u ON cs.owner_id = u.id
 			WHERE cs.shared_with = ?
 			ORDER BY cs.created_at DESC`,
 		)
 		.bind(userId)
 		.all();
 
-	// Try to resolve owner emails from the user table
-	const rows = result.results ?? [];
-	const shares: Array<{
-		shareId: string;
-		calendarId: number;
-		calendarName: string;
-		componentType: string;
-		ownerEmail: string;
-		permission: string;
-	}> = [];
-
-	for (const row of rows) {
-		// Try to get owner email from better-auth user table
-		const owner = await db
-			.prepare("SELECT email FROM user WHERE id = ?")
-			.bind(row.owner_id as string)
-			.first<{ email: string }>();
-
-		shares.push({
-			shareId: row.share_id as string,
-			calendarId: row.calendar_id as number,
-			calendarName: row.calendar_name as string,
-			componentType: row.component_type as string,
-			ownerEmail: owner?.email ?? (row.owner_id as string),
-			permission: row.permission as string,
-		});
-	}
-
-	return shares;
+	return (result.results ?? []).map((row) => ({
+		shareId: row.share_id as string,
+		calendarId: row.calendar_id as number,
+		calendarName: row.calendar_name as string,
+		componentType: row.component_type as string,
+		ownerEmail: (row.owner_email as string) ?? (row.owner_id as string),
+		permission: row.permission as string,
+	}));
 }
 
 function rowToShare(row: Record<string, unknown>): CalendarShare {
