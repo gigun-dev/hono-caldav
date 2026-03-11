@@ -97,6 +97,49 @@
 
 ---
 
+## Phase 5a: CalDAV RFC Complete Compliance (`6bbf526`..`8377f92`)
+
+### Features
+- Calendar-query REPORT filter engine (RFC 4791 §7.8, §9.7)
+  - comp-filter: VCALENDAR > VEVENT, VCALENDAR > VTODO
+  - time-range: DTSTART/DTEND/DUE/COMPLETED matching (RFC 4791 §9.9)
+  - prop-filter: is-not-defined, text-match
+  - text-match: contains, equals, starts-with, ends-with, negate-condition
+  - Collations: i;ascii-casemap, i;unicode-casemap
+- Duplicate UID rejection (409 Conflict)
+- Depth:infinity explicit rejection (403 Forbidden)
+- Non-ASCII content support (CJK, emoji) — verified with tests
+- Calendar collection DELETE (`/dav/projects/{id}/`)
+- ETag-based 304 Not Modified for GET requests
+- NaN-safe date parsing in time-range filters
+
+### Files Added
+- `src/caldav/query-filter.ts` — filter engine
+
+### Security Fixes
+- deleteCalendar() ownership verification (userId parameter)
+- parseIcsDate() NaN validation
+
+---
+
+## Phase 5c: RRULE Recurring Events (`5369ee0`)
+
+### Features
+- RRULE expansion in time-range queries
+- Conservative approach: events with RRULE checked against occurrence expansion
+- Expansion limit for infinite recurrence
+
+---
+
+## Phase 6b: Monitoring & Health (`ca8775c`)
+
+### Features
+- `/health` endpoint with D1 connectivity check
+- Structured JSON logging (requestId, durationMs, userAgent)
+- Request/response logging gated by DEBUG env var
+
+---
+
 ## Security Hardening (across multiple commits)
 
 - PBKDF2 password hashing (replaced SHA-256)
@@ -116,7 +159,8 @@
 
 | File | Tests | Coverage Area |
 |------|-------|---------------|
-| caldav.test.ts | 57 | CalDAV CRUD, sync, ETag, edge cases |
+| caldav.test.ts | 76 | CalDAV CRUD, sync, ETag, 304, Depth:infinity, non-ASCII, calendar delete, duplicate UID, edge cases |
+| query-filter.test.ts | 39 | Calendar-query filter parsing, comp/prop/time-range/text-match, RRULE, edge cases |
 | scheduling.test.ts | 28 | iTIP, attendee storage, feedback, API security |
 | xml.test.ts | 23 | XML prop filter, depth header, collection props |
 | ai.test.ts | 21 | AI response parsing, action execution |
@@ -127,4 +171,4 @@
 | mobileconfig.test.ts | 9 | Plist structure, XSS escaping |
 | natural-language-e2e.test.ts | 9 | ICS escaping, edge cases |
 | email-sender.test.ts | 4 | Resend API mock |
-| **Total** | **216** | |
+| **Total** | **274** | |
