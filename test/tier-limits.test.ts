@@ -22,6 +22,7 @@ const TIER_TEST_USERS = [
 	"tier-cal-user",
 	"tier-obj-user",
 	"tier-set-user",
+	"tier-webhook-user",
 ];
 
 function request(
@@ -263,6 +264,34 @@ describe("CalDAV tier limits (507 Insufficient Storage)", () => {
 			headers: { "Content-Type": "text/calendar" },
 		});
 		expect(res.status).toBe(204);
+	});
+});
+
+// === Webhook tier check (unit-level) ===
+// Note: HTTP-level webhook tier tests are skipped because better-auth session
+// cookie auth doesn't work in the vitest/miniflare test environment.
+// Instead we verify the tier logic directly.
+
+describe("Webhook tier check (unit)", () => {
+	it("free tier disables webhooks", () => {
+		expect(TIER_LIMITS.free.webhooksEnabled).toBe(false);
+	});
+
+	it("pro tier enables webhooks", () => {
+		expect(TIER_LIMITS.pro.webhooksEnabled).toBe(true);
+	});
+
+	it("free tier user would be blocked from creating webhooks", async () => {
+		const tier = await getUserTier(env.DB, "tier-webhook-user");
+		const limits = TIER_LIMITS[tier]!;
+		expect(limits.webhooksEnabled).toBe(false);
+	});
+
+	it("pro tier user is allowed to create webhooks", async () => {
+		await setUserTier(env.DB, "tier-webhook-user", "pro");
+		const tier = await getUserTier(env.DB, "tier-webhook-user");
+		const limits = TIER_LIMITS[tier]!;
+		expect(limits.webhooksEnabled).toBe(true);
 	});
 });
 

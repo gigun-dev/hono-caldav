@@ -44,8 +44,10 @@ import {
 	getSharedCalendars,
 } from "./sharing/api.js";
 import {
+	getUserTier,
 	getUserTierInfo,
 	createStripeCheckoutSession,
+	TIER_LIMITS,
 } from "./middleware/tier-limits.js";
 
 function timingSafeEqualStr(a: string, b: string): boolean {
@@ -302,6 +304,15 @@ app.all("/mcp", async (c) => {
 // --- Webhook API ---
 app.post("/api/webhooks", authGuard, async (c) => {
 	const user = c.get("user");
+	// Tier check: webhooks are Pro-only
+	const tier = await getUserTier(c.env.DB, user.id);
+	const limits = TIER_LIMITS[tier]!;
+	if (!limits.webhooksEnabled) {
+		return c.json(
+			{ error: "Webhooks require a Pro plan. Please upgrade to use this feature." },
+			403,
+		);
+	}
 	const body = await c.req.json<{
 		url?: string;
 		events?: string;
@@ -471,6 +482,14 @@ export default {
 
 		for (const { user_id: userId } of users) {
 			try {
+				// Tier check: Gmail polling is Pro-only
+				const userTier = await getUserTier(env.DB, userId);
+				const userLimits = TIER_LIMITS[userTier]!;
+				if (!userLimits.gmailPolling) {
+					console.log(`[Cron] Skipping Gmail poll for user ${userId}: gmailPolling not enabled on ${userTier} tier`);
+					continue;
+				}
+
 				const accessToken = await getValidAccessToken(
 					env.DB,
 					userId,
