@@ -1524,3 +1524,15 @@ describe("DELETE calendar collection", () => {
 		expect(res.status).toBe(404);
 	});
 });
+
+// === Health check ===
+
+describe("Health check", () => {
+	it("GET /health returns ok with DB status", async () => {
+		const res = await SELF.fetch("http://localhost/health");
+		expect(res.status).toBe(200);
+		const body = await res.json<{ status: string; db: string }>();
+		expect(body.status).toBe("ok");
+		expect(body.db).toBe("connected");
+	});
+});

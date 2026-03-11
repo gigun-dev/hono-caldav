@@ -40,23 +40,39 @@ function timingSafeEqualStr(a: string, b: string): boolean {
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
-// Debug middleware: log request details for CalDAV debugging (gated by DEBUG env var)
+// Structured logging middleware for CalDAV (gated by DEBUG env var)
 app.use("/dav/*", async (c, next) => {
 	const debug = (c.env as Record<string, string>).DEBUG === "true";
+	const requestId = crypto.randomUUID().slice(0, 8);
+	const startTime = Date.now();
 	if (debug) {
-		const method = c.req.method;
-		const path = c.req.path;
-		const depth = c.req.header("depth") ?? "-";
-		const contentType = c.req.header("content-type") ?? "-";
-		console.log(`[CalDAV] ${method} ${path} Depth:${depth} CT:${contentType}`);
-		if (["PUT", "PROPPATCH", "REPORT", "MKCOL"].includes(method)) {
+		const logEntry: Record<string, unknown> = {
+			requestId,
+			method: c.req.method,
+			path: c.req.path,
+			depth: c.req.header("depth") ?? null,
+			contentType: c.req.header("content-type") ?? null,
+			userAgent: c.req.header("user-agent") ?? null,
+		};
+		if (["PUT", "PROPPATCH", "REPORT", "MKCOL"].includes(c.req.method)) {
 			const body = await c.req.raw.clone().text();
-			console.log(`[CalDAV] Body (${body.length} bytes):\n${body.slice(0, 500)}`);
+			logEntry.bodyLength = body.length;
+			logEntry.bodyPreview = body.slice(0, 300);
 		}
+		console.log(JSON.stringify({ level: "debug", event: "request", ...logEntry }));
 	}
 	await next();
+	const duration = Date.now() - startTime;
 	if (debug) {
-		console.log(`[CalDAV] ${c.req.method} ${c.req.path} → ${c.res.status}`);
+		console.log(JSON.stringify({
+			level: "debug",
+			event: "response",
+			requestId,
+			method: c.req.method,
+			path: c.req.path,
+			status: c.res.status,
+			durationMs: duration,
+		}));
 	}
 });
 
@@ -205,6 +221,28 @@ app.all("/mcp", async (c) => {
 	}
 	const userId = c.env.MCP_USER_ID || "default";
 	return handleMcpRequest(c.req.raw, c.env.DB, userId, c.env);
+});
+
+// --- Health check ---
+app.get("/health", async (c) => {
+	try {
+		const result = await c.env.DB.prepare("SELECT 1 AS ok").first<{
+			ok: number;
+		}>();
+		if (result?.ok === 1) {
+			return c.json({ status: "ok", db: "connected" });
+		}
+		return c.json({ status: "degraded", db: "query failed" }, 503);
+	} catch (err) {
+		return c.json(
+			{
+				status: "error",
+				db: "unreachable",
+				error: err instanceof Error ? err.message : "unknown",
+			},
+			503,
+		);
+	}
 });
 
 // --- CalDAV routes ---
