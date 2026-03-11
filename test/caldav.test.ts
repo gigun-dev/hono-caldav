@@ -1785,6 +1785,77 @@ describe("PROPFIND ETag caching", () => {
 	});
 });
 
+// === CalDAV Edge Cases ===
+
+describe("CalDAV edge cases", () => {
+	let calendarId: number;
+
+	beforeAll(async () => {
+		calendarId = await seedCalendar("Edge Case Cal", "VTODO");
+	});
+
+	it("PROPFIND without Authorization header returns 401", async () => {
+		const res = await SELF.fetch(
+			`http://localhost/dav/projects/${calendarId}/`,
+			{
+				method: "PROPFIND",
+				headers: { Depth: "0" },
+			},
+		);
+		expect(res.status).toBe(401);
+		expect(res.headers.get("WWW-Authenticate")).toContain("Basic");
+	});
+
+	it("PUT with empty body returns 400", async () => {
+		const res = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/empty-body.ics`,
+			{
+				body: "",
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it("PUT with invalid ICS (no BEGIN:VCALENDAR) returns 400", async () => {
+		const res = await request(
+			"PUT",
+			`/dav/projects/${calendarId}/invalid-ics.ics`,
+			{
+				body: "This is not valid ICS data at all",
+				headers: { "Content-Type": "text/calendar" },
+			},
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it("DELETE on non-existent object returns 404", async () => {
+		const res = await request(
+			"DELETE",
+			`/dav/projects/${calendarId}/nonexistent-uid-12345.ics`,
+		);
+		expect(res.status).toBe(404);
+	});
+
+	it("REPORT sync-collection with invalid sync-token format returns 400", async () => {
+		const body = `<?xml version="1.0" encoding="UTF-8"?>
+<d:sync-collection xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:sync-token>not-a-number</d:sync-token>
+  <d:sync-level>1</d:sync-level>
+  <d:prop>
+    <d:getetag/>
+    <c:calendar-data/>
+  </d:prop>
+</d:sync-collection>`;
+
+		const res = await request("REPORT", `/dav/projects/${calendarId}/`, {
+			body,
+		});
+		expect(res.status).toBe(400);
+	});
+});
+
 // === Health check ===
 
 describe("Health check", () => {

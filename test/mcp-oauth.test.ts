@@ -559,3 +559,77 @@ describe("MCP OAuth - Revocation", () => {
 		expect(revokeRes.status).toBe(200);
 	});
 });
+
+describe("MCP OAuth - Token endpoint error cases", () => {
+	const CLIENT_ID = "error-test-client";
+	const USER_ID = "error-test-user";
+	const REDIRECT_URI = "http://localhost:3000/callback";
+
+	beforeAll(async () => {
+		await createTestClient(CLIENT_ID, [REDIRECT_URI]);
+		await createTestUser(USER_ID);
+	});
+
+	it("rejects unsupported grant_type (e.g. password)", async () => {
+		const res = await SELF.fetch("http://localhost/mcp/token", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ grant_type: "password", username: "a", password: "b" }),
+		});
+		expect(res.status).toBe(400);
+		const body = await res.json<{ error: string }>();
+		expect(body.error).toBe("unsupported_grant_type");
+	});
+
+	it("rejects authorization_code grant without code parameter", async () => {
+		const res = await SELF.fetch("http://localhost/mcp/token", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ grant_type: "authorization_code", client_id: CLIENT_ID }),
+		});
+		expect(res.status).toBe(400);
+		const body = await res.json<{ error: string; error_description: string }>();
+		expect(body.error).toBe("invalid_request");
+		expect(body.error_description).toContain("code is required");
+	});
+
+	it("rejects invalid JSON body with 400", async () => {
+		const res = await SELF.fetch("http://localhost/mcp/token", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: "this is not json{{{",
+		});
+		expect(res.status).toBe(400);
+		const body = await res.json<{ error: string; error_description: string }>();
+		expect(body.error).toBe("invalid_request");
+		expect(body.error_description).toContain("Invalid request body");
+	});
+
+	it("rejects authorization_code grant with non-existent code", async () => {
+		const res = await exchangeCode({
+			code: "non-existent-code-12345",
+			client_id: CLIENT_ID,
+		});
+		expect(res.status).toBe(400);
+		const body = await res.json<{ error: string }>();
+		expect(body.error).toBe("invalid_grant");
+	});
+
+	it("rejects authorization_code grant with non-existent client_id", async () => {
+		const code = crypto.randomUUID();
+		await insertAuthCode({
+			code,
+			clientId: CLIENT_ID,
+			userId: USER_ID,
+			redirectUri: REDIRECT_URI,
+		});
+
+		const res = await exchangeCode({
+			code,
+			client_id: "non-existent-client-id",
+		});
+		expect(res.status).toBe(400);
+		const body = await res.json<{ error: string }>();
+		expect(body.error).toBe("invalid_grant");
+	});
+});

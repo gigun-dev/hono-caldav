@@ -174,4 +174,41 @@ describe("Rate Limiting", () => {
 		expect(res.headers.get("X-RateLimit-Limit")).toBe("100");
 		expect(res.headers.get("X-RateLimit-Remaining")).toBeDefined();
 	});
+
+	it("should apply rate limit of 60 to /api/* endpoints", async () => {
+		const res = await SELF.fetch("http://localhost/api/webhooks", {
+			method: "GET",
+			redirect: "manual",
+		});
+		expect(res.headers.get("X-RateLimit-Limit")).toBe("60");
+		expect(
+			parseInt(res.headers.get("X-RateLimit-Remaining")!, 10),
+		).toBeLessThanOrEqual(59);
+	});
+
+	it("should use independent counters for different path prefixes", async () => {
+		// Make a DAV request
+		const davRes = await davRequest();
+		const davRemaining = parseInt(
+			davRes.headers.get("X-RateLimit-Remaining")!,
+			10,
+		);
+
+		// Make an API request — should have its own counter
+		const apiRes = await SELF.fetch("http://localhost/api/webhooks", {
+			method: "GET",
+			redirect: "manual",
+		});
+		const apiRemaining = parseInt(
+			apiRes.headers.get("X-RateLimit-Remaining")!,
+			10,
+		);
+
+		// DAV limit is 100, API limit is 60 — different limits confirm different counters
+		expect(davRes.headers.get("X-RateLimit-Limit")).toBe("100");
+		expect(apiRes.headers.get("X-RateLimit-Limit")).toBe("60");
+		// Both should have high remaining (near their respective limits)
+		expect(davRemaining).toBeGreaterThanOrEqual(90);
+		expect(apiRemaining).toBeGreaterThanOrEqual(50);
+	});
 });

@@ -123,6 +123,45 @@
 - [ ] `DEBUG=true` で `bun run dev` → CalDAV リクエストが JSON 形式でログ出力
 - [ ] requestId, durationMs, status がログに含まれる
 
+## Phase 5b: MCP OAuth
+
+### 5b.1 OAuth メタデータ
+- [ ] `curl http://localhost:8787/.well-known/oauth-authorization-server` → JSON メタデータ返却
+- [ ] authorization_endpoint, token_endpoint, revocation_endpoint が正しいパスか確認
+
+### 5b.2 OAuth フロー (ブラウザ)
+- [ ] ログイン後、`/mcp/authorize?client_id=test&redirect_uri=http://localhost:3000/callback&response_type=code&code_challenge=xxx&code_challenge_method=S256` にアクセス → redirect_uri にコード付きリダイレクト
+- [ ] `/mcp/token` で code → access_token 交換
+- [ ] 取得した access_token で `/mcp` にリクエスト → 成功
+
+## Phase 6a: パフォーマンス
+
+### 6a.1 レートリミット
+- [ ] CalDAV リクエスト → レスポンスヘッダに `X-RateLimit-Limit: 100` が含まれる
+- [ ] `X-RateLimit-Remaining` がリクエストごとに減少
+- [ ] Proxyman: 大量リクエスト時に 429 Too Many Requests が返る
+- [ ] `/health` にはレートリミットヘッダがつかない
+
+### 6a.2 ETag キャッシュ
+- [ ] PROPFIND レスポンスに ETag ヘッダが含まれる
+- [ ] If-None-Match でキャッシュヒット時 304 Not Modified
+
+## Phase 7b: Webhook
+
+### 7b.1 Webhook 登録
+- [ ] `POST /api/webhooks` で webhook 登録
+- [ ] `GET /api/webhooks` でリスト確認
+- [ ] タスク作成/更新/削除時に webhook URL にリクエストが飛ぶ
+- [ ] Webhook リクエストの `X-Webhook-Signature` ヘッダを確認
+
+## Phase 7c: カレンダー共有
+
+### 7c.1 共有 API
+- [ ] `POST /api/calendars/:id/share` で共有設定
+- [ ] `GET /api/shared-calendars` で共有カレンダー確認
+- [ ] 共有カレンダーが PROPFIND に含まれるか確認
+- [ ] read 権限の共有カレンダーへの PUT → 403
+
 ## 確認ポイント (Proxyman)
 
 ### 注目すべきヘッダー
@@ -130,6 +169,9 @@
 - `Content-Type: application/xml; charset=utf-8`
 - `ETag: "..."` (GET/PUT レスポンス)
 - `WWW-Authenticate: Basic realm="CalDAV"` (401時)
+- `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (レートリミット)
+- `Retry-After` (429 時)
+- `X-Webhook-Signature` (Webhook)
 
 ### 注目すべきステータスコード
 - 207 Multi-Status (PROPFIND, REPORT)
