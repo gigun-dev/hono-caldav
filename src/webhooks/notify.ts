@@ -71,7 +71,8 @@ export async function getMatchingWebhooks(
 
 /**
  * Fire webhook notifications for a calendar event.
- * Fire-and-forget: errors are logged but do not propagate.
+ * Returns a Promise that resolves when all notifications are sent.
+ * In production, pass ctx to use waitUntil for fire-and-forget.
  */
 export function fireWebhook(
 	db: D1Database,
@@ -79,7 +80,7 @@ export function fireWebhook(
 	event: WebhookEvent,
 	payload: Omit<WebhookPayload, "event" | "timestamp">,
 	ctx?: ExecutionContext,
-): void {
+): Promise<void> {
 	const fullPayload: WebhookPayload = {
 		event,
 		calendarId: payload.calendarId,
@@ -122,12 +123,11 @@ export function fireWebhook(
 		}
 	};
 
+	const promise = work();
 	if (ctx) {
-		ctx.waitUntil(work());
-	} else {
-		// Fallback: just run it (for testing or environments without ctx)
-		work();
+		ctx.waitUntil(promise);
 	}
+	return promise;
 }
 
 // --- Webhook CRUD ---

@@ -698,13 +698,12 @@ export function registerCaldavRoutes(
 
 		const { object, created } = await putObject(c.env.DB, cal.id, uid, icsData);
 
-		// Fire webhook notification (fire-and-forget)
-		fireWebhook(
+		// Fire webhook notification (awaited to stay within request scope)
+		await fireWebhook(
 			c.env.DB,
 			user.id,
 			created ? "create" : "update",
 			{ calendarId: cal.id, uid },
-			c.executionCtx,
 		);
 
 		if (created) {
@@ -757,13 +756,12 @@ export function registerCaldavRoutes(
 			return c.text("Object not found", 404);
 		}
 
-		// Fire webhook notification (fire-and-forget)
-		fireWebhook(
+		// Fire webhook notification (awaited to stay within request scope)
+		await fireWebhook(
 			c.env.DB,
 			user.id,
 			"delete",
 			{ calendarId: cal.id, uid },
-			c.executionCtx,
 		);
 
 		return c.body(null, 204);
