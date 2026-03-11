@@ -279,11 +279,23 @@ export function registerCaldavRoutes(
 		if (!cal) {
 			return c.text("Calendar not found", 404);
 		}
+
+		// ETag/If-None-Match caching using calendar ctag
+		const calEtag = `"${cal.ctag}"`;
+		const ifNoneMatch = c.req.header("if-none-match");
+		if (ifNoneMatch && ifNoneMatch === calEtag) {
+			return c.body(null, 304, { ETag: calEtag });
+		}
+
 		if (depth === "1") {
 			const objects = await getObjectsForCalendar(c.env.DB, cal.id);
-			return buildCalendarWithObjectsResponse(c, cal, objects, filter);
+			const res = buildCalendarWithObjectsResponse(c, cal, objects, filter);
+			res.headers.set("ETag", calEtag);
+			return res;
 		}
-		return buildCalendarResponse(c, cal, filter);
+		const res = buildCalendarResponse(c, cal, filter);
+		res.headers.set("ETag", calEtag);
+		return res;
 	};
 
 	const handleReport = async (c: Context<{ Bindings: CloudflareBindings }>) => {

@@ -31,6 +31,7 @@ src/
 │   ├── handlers.ts          # CalDAV HTTP ハンドラ (PROPFIND, REPORT, PUT, GET, DELETE, PROPPATCH, MKCOL)
 │   ├── storage.ts           # D1 ストレージ層 (Calendar, CalendarObject, CalendarChange CRUD)
 │   ├── ical.ts              # ICS パース (UID 抽出、VTODO/VEVENT 検証)
+│   ├── query-filter.ts      # Calendar-query フィルタエンジン (comp/prop/time-range/text-match, RRULE 展開)
 │   └── xml.ts               # DAV XML レスポンスビルダ
 ├── mcp/
 │   └── handler.ts           # MCP Server (JSON-RPC, 10 tools)
@@ -47,6 +48,8 @@ src/
 │   ├── google-auth.ts       # OAuth token refresh
 │   ├── google-calendar.ts   # Google Calendar API client
 │   └── gmail-worker.ts      # Gmail polling pipeline
+├── webhooks/
+│   └── notify.ts            # Webhook 通知 (HMAC-SHA256 署名)
 ├── setup/
 │   └── mobileconfig.ts      # iOS mobileconfig 生成
 └── pages/
@@ -71,8 +74,9 @@ src/
 - `attendees` — iTIP attendee tracking (partstat, rsvp)
 - `scheduling_feedback` — DECLINED/COUNTER フィードバック
 - `gmail_sync_state` — Gmail polling 状態
+- `webhooks` — Webhook 登録 (url, secret, event_types, active)
 
-マイグレーションは `migrations/` ディレクトリ (0001-0007)。
+マイグレーションは `migrations/` ディレクトリ (0001-0008)。
 
 ### 同期方式
 
@@ -85,7 +89,25 @@ sync-token はカレンダーごとの整数カウンタ。
 - TypeScript strict モード
 - `.js` 拡張子付きインポート (`./storage.js`)
 - Hono の型: `Hono<{ Bindings: CloudflareBindings }>`
-- テストは `test/` ディレクトリ、`SELF.fetch()` でインテグレーションテスト
+- テストは `test/` ディレクトリ、`SELF.fetch()` でインテグレーションテスト (292+ テスト / 13 ファイル)
+
+## 主要機能
+
+- CalDAV CRUD (PROPFIND, REPORT, PUT, GET, DELETE, PROPPATCH, MKCOL)
+- Calendar-query REPORT フィルタリング (comp-filter, prop-filter, time-range, text-match)
+- RRULE 繰り返しイベント展開 (time-range クエリ内)
+- sync-collection REPORT (差分同期)
+- ETag ベース 304 Not Modified
+- カレンダーコレクション DELETE
+- Duplicate UID 拒否 (409 Conflict)
+- Depth:infinity 拒否 (403 Forbidden)
+- Webhook 通知 (HMAC-SHA256 署名、タスク作成/更新/完了/削除)
+- `/health` エンドポイント (D1 接続確認)
+- MCP Server (10 tools, JSON-RPC)
+- Workers AI 自然言語 CRUD
+- Gmail タスク抽出 + Google Calendar 連携
+- iTIP/iMIP スケジューリング (SaaS as Organizer)
+- iOS mobileconfig 自動生成
 
 ## 認証 (3系統)
 

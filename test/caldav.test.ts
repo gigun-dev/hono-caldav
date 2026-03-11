@@ -1725,6 +1725,66 @@ describe("Edge case coverage", () => {
 	});
 });
 
+// === PROPFIND ETag / If-None-Match caching ===
+
+describe("PROPFIND ETag caching", () => {
+	let calendarId: number;
+
+	beforeAll(async () => {
+		calendarId = await seedCalendar("ETag Cache Test", "VTODO");
+	});
+
+	it("PROPFIND response includes ETag header", async () => {
+		const res = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			headers: { Depth: "0" },
+		});
+		expect(res.status).toBe(207);
+		const etag = res.headers.get("etag");
+		expect(etag).toBeTruthy();
+	});
+
+	it("PROPFIND with matching If-None-Match returns 304", async () => {
+		// First request to get the ETag
+		const res1 = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			headers: { Depth: "0" },
+		});
+		expect(res1.status).toBe(207);
+		const etag = res1.headers.get("etag");
+		expect(etag).toBeTruthy();
+
+		// Second request with If-None-Match
+		const res2 = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			headers: { Depth: "0", "If-None-Match": etag! },
+		});
+		expect(res2.status).toBe(304);
+	});
+
+	it("PROPFIND with stale If-None-Match returns 207 with body", async () => {
+		// First request to get the ETag
+		const res1 = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			headers: { Depth: "0" },
+		});
+		expect(res1.status).toBe(207);
+		const etag = res1.headers.get("etag");
+		expect(etag).toBeTruthy();
+
+		// Modify the calendar to change the ctag
+		const ics = makeVtodo("etag-test-obj", "ETag test task");
+		await request("PUT", `/dav/projects/${calendarId}/etag-test-obj.ics`, {
+			body: ics,
+			headers: { "Content-Type": "text/calendar" },
+		});
+
+		// Request with the old (stale) ETag
+		const res2 = await request("PROPFIND", `/dav/projects/${calendarId}/`, {
+			headers: { Depth: "0", "If-None-Match": etag! },
+		});
+		expect(res2.status).toBe(207);
+		const xml = await res2.text();
+		expect(xml).toContain("multistatus");
+	});
+});
+
 // === Health check ===
 
 describe("Health check", () => {

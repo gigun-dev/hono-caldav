@@ -30,6 +30,12 @@ import {
 	listWebhooks,
 	deleteWebhook,
 } from "./webhooks/notify.js";
+import {
+	shareCalendar,
+	listShares,
+	revokeShare,
+	getSharedCalendars,
+} from "./sharing/api.js";
 
 function timingSafeEqualStr(a: string, b: string): boolean {
 	const encoder = new TextEncoder();
@@ -263,6 +269,70 @@ app.delete("/api/webhooks/:id", authGuard, async (c) => {
 		return c.json({ error: "Webhook not found" }, 404);
 	}
 	return c.body(null, 204);
+});
+
+// --- Calendar Sharing API ---
+app.post("/api/calendars/:id/share", authGuard, async (c) => {
+	const user = c.get("user");
+	const calendarId = Number(c.req.param("id"));
+	const body = await c.req.json<{
+		sharedWith?: string;
+		permission?: string;
+	}>();
+	if (!body.sharedWith) {
+		return c.json({ error: "sharedWith is required" }, 400);
+	}
+	const permission = body.permission || "read";
+	if (permission !== "read" && permission !== "read-write") {
+		return c.json(
+			{ error: "permission must be 'read' or 'read-write'" },
+			400,
+		);
+	}
+	try {
+		const share = await shareCalendar(
+			c.env.DB,
+			user.id,
+			calendarId,
+			body.sharedWith,
+			permission,
+		);
+		if (!share) {
+			return c.json({ error: "Calendar not found or not owned by you" }, 404);
+		}
+		return c.json(share, 201);
+	} catch (err: unknown) {
+		if (
+			err instanceof Error &&
+			err.message.includes("UNIQUE constraint failed")
+		) {
+			return c.json({ error: "Calendar already shared with this user" }, 409);
+		}
+		throw err;
+	}
+});
+
+app.get("/api/calendars/:id/shares", authGuard, async (c) => {
+	const user = c.get("user");
+	const calendarId = Number(c.req.param("id"));
+	const shares = await listShares(c.env.DB, calendarId, user.id);
+	return c.json(shares);
+});
+
+app.delete("/api/calendars/:id/shares/:shareId", authGuard, async (c) => {
+	const user = c.get("user");
+	const shareId = c.req.param("shareId");
+	const revoked = await revokeShare(c.env.DB, shareId, user.id);
+	if (!revoked) {
+		return c.json({ error: "Share not found" }, 404);
+	}
+	return c.body(null, 204);
+});
+
+app.get("/api/shared-calendars", authGuard, async (c) => {
+	const user = c.get("user");
+	const shared = await getSharedCalendars(c.env.DB, user.id);
+	return c.json(shared);
 });
 
 // --- Health check ---

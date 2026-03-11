@@ -40,6 +40,7 @@ export type CalendarChange = {
 export async function getCalendarsForUser(
 	db: D1Database,
 	userId: string,
+	includeShared: boolean = false,
 ): Promise<Calendar[]> {
 	const result = await db
 		.prepare(
@@ -47,7 +48,24 @@ export async function getCalendarsForUser(
 		)
 		.bind(userId)
 		.all();
-	return (result.results ?? []).map(rowToCalendar);
+	const owned = (result.results ?? []).map(rowToCalendar);
+
+	if (!includeShared) return owned;
+
+	// Also fetch calendars shared with this user (by user_id or email)
+	const shared = await db
+		.prepare(
+			`SELECT c.id, c.user_id, c.name, c.component_type, c.ctag, c.synctoken, c.color, c.calendar_order, c.created_at, c.updated_at
+			FROM calendars c
+			JOIN calendar_shares cs ON c.id = cs.calendar_id
+			WHERE cs.shared_with = ?
+			ORDER BY c.id ASC`,
+		)
+		.bind(userId)
+		.all();
+	const sharedCals = (shared.results ?? []).map(rowToCalendar);
+
+	return [...owned, ...sharedCals];
 }
 
 export async function getCalendarById(
@@ -222,19 +240,18 @@ export async function deleteCalendar(
 		.first();
 	if (!cal) return false;
 
-	// Delete in order: objects, changes, then the calendar itself
-	await db
-		.prepare("DELETE FROM calendar_objects WHERE calendar_id = ?")
-		.bind(calendarId)
-		.run();
-	await db
-		.prepare("DELETE FROM calendarchanges WHERE calendar_id = ?")
-		.bind(calendarId)
-		.run();
-	await db
-		.prepare("DELETE FROM calendars WHERE id = ?")
-		.bind(calendarId)
-		.run();
+	// Delete in a single batch transaction: objects, changes, then the calendar itself
+	await db.batch([
+		db
+			.prepare("DELETE FROM calendar_objects WHERE calendar_id = ?")
+			.bind(calendarId),
+		db
+			.prepare("DELETE FROM calendarchanges WHERE calendar_id = ?")
+			.bind(calendarId),
+		db
+			.prepare("DELETE FROM calendars WHERE id = ? AND user_id = ?")
+			.bind(calendarId, userId),
+	]);
 	return true;
 }
 

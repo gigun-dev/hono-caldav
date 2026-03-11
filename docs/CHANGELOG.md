@@ -140,6 +140,20 @@
 
 ---
 
+## Phase 7b: Webhook Notifications
+
+### Features
+- Webhook registration API (CRUD)
+- HMAC-SHA256 request signing
+- Event types: task.created, task.updated, task.completed, task.deleted
+- Per-user webhook isolation
+
+### Files Added
+- `src/webhooks/notify.ts` — Webhook notification system
+- `migrations/0008_webhooks.sql` — Webhook table
+
+---
+
 ## Security Hardening (across multiple commits)
 
 - PBKDF2 password hashing (replaced SHA-256)
@@ -170,5 +184,6 @@
 | auth.test.ts | 11 | App Password PBKDF2, CalDAV auth |
 | mobileconfig.test.ts | 9 | Plist structure, XSS escaping |
 | natural-language-e2e.test.ts | 9 | ICS escaping, edge cases |
+| webhooks.test.ts | TBD | Webhook CRUD, HMAC signing, event delivery |
 | email-sender.test.ts | 4 | Resend API mock |
-| **Total** | **274** | |
+| **Total** | **292+** | |
