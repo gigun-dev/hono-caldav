@@ -155,6 +155,23 @@
 
 ---
 
+## Phase 6c: Tier Limits & Billing Skeleton
+
+### Features
+- `user_tiers` テーブル (tier: free/pro, stripe_customer_id, stripe_subscription_id)
+- Free tier 制限: 3 calendars, 100 objects per calendar
+- Pro tier: unlimited calendars & objects
+- CalDAV 507 Insufficient Storage レスポンス (制限超過時)
+- Stripe checkout skeleton (セッション作成エンドポイント)
+
+### Files Added
+- `src/billing/tiers.ts` — Tier enforcement logic
+- `src/billing/stripe.ts` — Stripe checkout skeleton
+- `migrations/0012_user_tiers.sql` — user_tiers table
+- `test/tier-limits.test.ts` — 15 tests
+
+---
+
 ## Phase 6a: Performance
 
 ### Features
@@ -233,4 +250,5 @@
 | mcp-oauth.test.ts | 21 | MCP OAuth flow, PKCE, token management, well-known metadata |
 | rate-limit.test.ts | 8 | Rate limiting, sliding window, per-user isolation |
 | email-sender.test.ts | 4 | Resend API mock |
-| **Total** | **337+** | **17 files** |
+| tier-limits.test.ts | 15 | Tier enforcement, Free/Pro limits, 507 response, Stripe checkout |
+| **Total** | **364+** | **18 files** |

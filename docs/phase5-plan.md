@@ -8,7 +8,7 @@
 - Scheduling: iTIP/iMIP (SaaS as Organizer)
 - Webhook: HMAC-SHA256 署名付き通知
 - 監視: /health エンドポイント + 構造化 JSON ログ
-- テスト: 337+テスト / 17ファイル
+- テスト: 364+テスト / 18ファイル
 
 ### 完了した Phase
 - **Phase 5a** ✅ calendar-query filter (comp/prop/time-range/text-match), Duplicate UID 拒否, Depth:infinity, 非 ASCII, カレンダー削除
@@ -18,6 +18,7 @@
 - **Phase 5b** ✅ MCP OAuth (Authorization Code + PKCE, D1ベース, well-known metadata, legacy互換)
 - **Phase 6a** ✅ Performance (レートリミット, バッチ INSERT, updatePartstat最適化, D1インデックス)
 - **Phase 7c** ✅ カレンダー共有 (share/list/revoke, IDOR 防止)
+- **Phase 6c** ✅ Tier基盤 (user_tiers, Free/Pro制限, 507レスポンス, Stripe checkout skeleton)
 
 ---
 
@@ -132,15 +133,13 @@ Claude Desktop 等から動的にユーザー認証できるようになる。
    - CalDAV リクエスト成功率
    - sync-collection 使用頻度
 
-### 6c: マルチテナント — 未着手
+### 6c: Tier基盤 ✅ 完了
 
-1. **per-user D1 分割** (10GB 上限対策)
-   - ユーザー数 1000+ で検討
-   - DB ルーティングレイヤー
-
-2. **Stripe 課金統合**
-   - Free tier: 1 calendar, 100 tasks
-   - Pro tier: unlimited calendars, Gmail polling
+1. **user_tiers テーブル** — tier (free/pro), stripe_customer_id, stripe_subscription_id
+2. **Free tier 制限** — 3 calendars, 100 objects per calendar
+3. **Pro tier** — unlimited calendars & objects
+4. **CalDAV 507 Insufficient Storage** — 制限超過時のレスポンス
+5. **Stripe checkout skeleton** — セッション作成エンドポイント
 
 ---
 
@@ -176,7 +175,7 @@ Claude Desktop 等から動的にユーザー認証できるようになる。
 | 5c | RRULE 展開 | 高 | 高 | ✅ 完了 |
 | 6a | D1 最適化 | 中 | 中 | ✅ 完了 |
 | 6b | 監視・ログ | 低 | 中 | ✅ 完了 |
-| 6c | マルチテナント | 高 | 低 (初期) | 未着手 |
+| 6c | Tier基盤 | 中 | 中 | ✅ 完了 |
 | 7a | CalDAV Client SDK | 中 | 中 | 未着手 |
 | 7b | Webhook 通知 | 中 | 中 | ✅ 完了 |
 | 7c | カレンダー共有 | 中 | 中 | ✅ 完了 |

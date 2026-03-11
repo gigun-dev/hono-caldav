@@ -10,6 +10,14 @@ export interface TierLimits {
 	webhooksEnabled: boolean;
 }
 
+const VALID_TIERS = ["free", "pro"] as const;
+type Tier = (typeof VALID_TIERS)[number];
+
+function sanitizeTier(tier: string | undefined | null): Tier {
+	if (tier && VALID_TIERS.includes(tier as Tier)) return tier as Tier;
+	return "free";
+}
+
 export const TIER_LIMITS: Record<string, TierLimits> = {
 	free: {
 		maxCalendars: 3,
@@ -36,7 +44,7 @@ export async function getUserTier(
 		.prepare("SELECT tier FROM user_tiers WHERE user_id = ?")
 		.bind(userId)
 		.first<{ tier: string }>();
-	return row?.tier ?? "free";
+	return sanitizeTier(row?.tier);
 }
 
 /**
@@ -62,10 +70,10 @@ export async function getUserTierInfo(
 			stripe_subscription_id: string | null;
 		}>();
 
-	const tier = row?.tier ?? "free";
+	const tier = sanitizeTier(row?.tier);
 	return {
 		tier,
-		limits: TIER_LIMITS[tier] ?? TIER_LIMITS.free!,
+		limits: TIER_LIMITS[tier]!,
 		stripeCustomerId: row?.stripe_customer_id ?? null,
 		stripeSubscriptionId: row?.stripe_subscription_id ?? null,
 	};
@@ -80,7 +88,7 @@ export async function checkCalendarLimit(
 	userId: string,
 ): Promise<boolean> {
 	const tier = await getUserTier(db, userId);
-	const limits = TIER_LIMITS[tier] ?? TIER_LIMITS.free!;
+	const limits = TIER_LIMITS[tier]!;
 
 	if (limits.maxCalendars === -1) return true; // unlimited
 
@@ -104,7 +112,7 @@ export async function checkObjectLimit(
 	calendarId: number,
 ): Promise<boolean> {
 	const tier = await getUserTier(db, userId);
-	const limits = TIER_LIMITS[tier] ?? TIER_LIMITS.free!;
+	const limits = TIER_LIMITS[tier]!;
 
 	if (limits.maxObjectsPerCalendar === -1) return true; // unlimited
 
@@ -124,10 +132,13 @@ export async function checkObjectLimit(
 export async function setUserTier(
 	db: D1Database,
 	userId: string,
-	tier: string,
+	tier: string, // validated below
 	stripeCustomerId?: string | null,
 	stripeSubscriptionId?: string | null,
 ): Promise<void> {
+	if (!VALID_TIERS.includes(tier as Tier)) {
+		throw new Error(`Invalid tier: ${tier}. Must be one of: ${VALID_TIERS.join(", ")}`);
+	}
 	await db
 		.prepare(
 			`INSERT INTO user_tiers (user_id, tier, stripe_customer_id, stripe_subscription_id, tier_updated_at)
