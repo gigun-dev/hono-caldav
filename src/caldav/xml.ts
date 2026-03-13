@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 
-import type { CaldavUser } from "../auth/caldav-token.js";
+import type { CaldavUser } from "../auth/auth.js";
 import type { Calendar, CalendarObject } from "./storage.js";
 
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";

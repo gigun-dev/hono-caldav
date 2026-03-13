@@ -15,10 +15,10 @@ export default defineWorkersProject(async () => {
 					miniflare: {
 						bindings: {
 							TEST_MIGRATIONS: migrations,
-							// Test-only credentials for the in-memory miniflare runtime.
-							// These are not real secrets — do not use in production.
-							CALDAV_USERNAME: "test-user",
-							CALDAV_PASSWORD: "test-pass",
+							BETTER_AUTH_ALLOWED_HOSTS: "localhost",
+							BETTER_AUTH_SECRET: "test-secret",
+							GOOGLE_CLIENT_ID: "test",
+							GOOGLE_CLIENT_SECRET: "test",
 						},
 					},
 				},

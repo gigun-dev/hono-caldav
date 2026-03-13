@@ -4,8 +4,9 @@ import "../src/index";
 
 // --- Helpers ---
 
-const AUTH = "Basic " + btoa("test-user:test-pass");
-const AUTH_BAD = "Basic " + btoa("test-user:wrong");
+// App Password auth: email:app-password
+const AUTH = "Basic " + btoa("admin:changeme");
+const AUTH_BAD = "Basic " + btoa("admin:wrong-password");
 
 function request(
 	method: string,
@@ -58,16 +59,17 @@ function makeVevent(uid: string, summary: string): string {
 async function seedCalendar(
 	name: string,
 	componentType: string,
+	userId = "test-user-a",
 ): Promise<number> {
 	await env.DB.prepare(
 		"INSERT INTO calendars (user_id, name, component_type) VALUES (?, ?, ?)",
 	)
-		.bind("default", name, componentType)
+		.bind(userId, name, componentType)
 		.run();
 	const row = await env.DB.prepare(
 		"SELECT id FROM calendars WHERE user_id = ? ORDER BY id DESC LIMIT 1",
 	)
-		.bind("default")
+		.bind(userId)
 		.first<{ id: number }>();
 	return row!.id;
 }
@@ -114,7 +116,7 @@ describe("PROPFIND", () => {
 		expect(res.status).toBe(207);
 		const xml = await res.text();
 		expect(xml).toContain("current-user-principal");
-		expect(xml).toContain("/dav/principals/test-user/");
+		expect(xml).toContain("/dav/principals/admin/");
 	});
 
 	it("OPTIONS / returns 204 with DAV headers", async () => {
@@ -129,11 +131,14 @@ describe("PROPFIND", () => {
 		expect(res.status).toBe(207);
 		const xml = await res.text();
 		expect(xml).toContain("current-user-principal");
-		expect(xml).toContain("/dav/principals/test-user/");
+		expect(xml).toContain("/dav/principals/admin/");
 	});
 
-	it("PROPFIND /dav/principals/test-user returns calendar-home-set", async () => {
-		const res = await request("PROPFIND", "/dav/principals/test-user");
+	it("PROPFIND /dav/principals/admin returns calendar-home-set", async () => {
+		const res = await request(
+			"PROPFIND",
+			"/dav/principals/admin",
+		);
 		expect(res.status).toBe(207);
 		const xml = await res.text();
 		expect(xml).toContain("calendar-home-set");
@@ -230,7 +235,6 @@ describe("PUT", () => {
 	});
 
 	it("updates an existing VTODO and returns 200", async () => {
-		// Create first, then update in the same test
 		const ics1 = makeVtodo("test-put-2", "Original");
 		const res1 = await request(
 			"PUT",
@@ -320,7 +324,6 @@ describe("DELETE", () => {
 		);
 		expect(res.status).toBe(204);
 
-		// Verify it's gone
 		const getRes = await request(
 			"GET",
 			`/dav/projects/${calendarId}/test-del-1.ics`,
@@ -371,14 +374,12 @@ describe("REPORT sync-collection", () => {
 	});
 
 	it("incremental sync detects additions", async () => {
-		// Create initial object to get a sync token
 		const ics1 = makeVtodo("sync-add-base", "Base");
 		await request("PUT", `/dav/projects/${calendarId}/sync-add-base.ics`, {
 			body: ics1,
 			headers: { "Content-Type": "text/calendar" },
 		});
 
-		// Get current sync token
 		const syncBody1 = `<?xml version="1.0" encoding="UTF-8"?>
 <d:sync-collection xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
   <d:sync-token></d:sync-token>
@@ -392,14 +393,12 @@ describe("REPORT sync-collection", () => {
 		expect(tokenMatch).toBeTruthy();
 		const token = tokenMatch![1];
 
-		// Add a new object
 		const ics2 = makeVtodo("sync-add-new", "New sync item");
 		await request("PUT", `/dav/projects/${calendarId}/sync-add-new.ics`, {
 			body: ics2,
 			headers: { "Content-Type": "text/calendar" },
 		});
 
-		// Incremental sync
 		const syncBody2 = `<?xml version="1.0" encoding="UTF-8"?>
 <d:sync-collection xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
   <d:sync-token>${token}</d:sync-token>
@@ -411,19 +410,16 @@ describe("REPORT sync-collection", () => {
 		expect(res2.status).toBe(207);
 		const xml2 = await res2.text();
 		expect(xml2).toContain("sync-add-new");
-		// Should NOT contain the base object
 		expect(xml2).not.toContain("sync-add-base");
 	});
 
 	it("incremental sync detects deletions", async () => {
-		// Create an object
 		const ics = makeVtodo("sync-del-target", "Will delete");
 		await request("PUT", `/dav/projects/${calendarId}/sync-del-target.ics`, {
 			body: ics,
 			headers: { "Content-Type": "text/calendar" },
 		});
 
-		// Get current sync token
 		const syncBody1 = `<?xml version="1.0" encoding="UTF-8"?>
 <d:sync-collection xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
   <d:sync-token></d:sync-token>
@@ -436,10 +432,8 @@ describe("REPORT sync-collection", () => {
 		const tokenMatch = xml1.match(/<d:sync-token>(\d+)<\/d:sync-token>/);
 		const token = tokenMatch![1];
 
-		// Delete the object
 		await request("DELETE", `/dav/projects/${calendarId}/sync-del-target.ics`);
 
-		// Incremental sync — should see 410 Gone
 		const syncBody2 = `<?xml version="1.0" encoding="UTF-8"?>
 <d:sync-collection xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
   <d:sync-token>${token}</d:sync-token>
@@ -534,7 +528,6 @@ describe("PROPPATCH", () => {
 		const xml = await res.text();
 		expect(xml).toContain("Renamed Calendar");
 
-		// Verify PROPFIND reflects the change
 		const propfindRes = await request(
 			"PROPFIND",
 			`/dav/projects/${calendarId}/`,
@@ -646,7 +639,6 @@ describe("Extended MKCOL", () => {
 		const location = res.headers.get("Location")!;
 		expect(location).toBeTruthy();
 
-		// PROPFIND the created calendar to verify color and order
 		const propRes = await request("PROPFIND", location, {
 			headers: { Depth: "0" },
 		});
@@ -799,7 +791,6 @@ describe("ETag SHA-256", () => {
 		expect(res.status).toBe(201);
 		const etag = res.headers.get("ETag");
 		expect(etag).toBeTruthy();
-		// SHA-256 hex = 64 chars, wrapped in quotes = 66 chars
 		expect(etag).toMatch(/^"[0-9a-f]{64}"$/);
 	});
 
