@@ -1,4 +1,4 @@
-.PHONY: test up down seed reset-db erase-simulator e2e e2e-web e2e-ios ci ci-ios
+.PHONY: test up stop seed reset-db erase-simulator e2e-ios ci
 
 -include .env
 export
@@ -7,22 +7,30 @@ export
 # Server Management
 # =============================================================================
 
-# DB リセット + サーバー起動 (wrangler dev がフォアグラウンドで動く)
-up: down reset-db
-	@echo "Starting MKCALENDAR proxy..."
-	@bun run dev:proxy &
-	@echo "Starting cloudflared tunnel..."
+# サーバー起動 (BG=1 で CI 用バックグラウンドモード)
+#   make up     → ログ表示、Ctrl+C で全停止
+#   make up BG=1 → 全バックグラウンド (CI 用)
+up: stop reset-db
 	@cloudflared tunnel run --token $(CLOUDFLARED_TOKEN) > /dev/null 2>&1 &
-	@(sleep 5 && curl -sL http://localhost:8787/demo > /dev/null && echo "[make] Demo user seeded") &
-	@echo "Starting wrangler dev... (Ctrl+C to stop, then 'make down' to stop all)"
-	bun run dev
+	@if [ "$(BG)" = "1" ]; then \
+		bun run dev:proxy > /dev/null 2>&1 & \
+		bun run dev > /dev/null 2>&1 & \
+		for i in $$(seq 1 30); do curl -s http://localhost:8787/ > /dev/null 2>&1 && break; sleep 1; done; \
+		curl -sL http://localhost:8787/demo > /dev/null; \
+		echo "Server ready (background)"; \
+	else \
+		bun run dev:proxy & \
+		(sleep 5 && curl -sL http://localhost:8787/demo > /dev/null && echo "[make] Demo user seeded") & \
+		trap 'pkill -f "wrangler dev" 2>/dev/null; pkill -f "bun run proxy" 2>/dev/null; pkill -f "cloudflared tunnel" 2>/dev/null; echo "\nAll services stopped"; exit 0' INT TERM; \
+		echo "Starting wrangler dev... (Ctrl+C to stop all)"; \
+		bun run dev; \
+	fi
 
 # サーバー停止
-down:
-	@pkill -f "wrangler dev" || true
-	@pkill -f "bun run proxy" || true
-	@pkill -f "cloudflared tunnel" || true
-	@echo "All services stopped"
+stop:
+	@pkill -f "wrangler dev" 2>/dev/null || true
+	@pkill -f "bun run proxy" 2>/dev/null || true
+	@pkill -f "cloudflared tunnel" 2>/dev/null || true
 
 # DB リセット + マイグレーション
 reset-db:
@@ -59,17 +67,6 @@ erase-simulator:
 # E2E (Maestro) — サーバー起動済み前提
 # =============================================================================
 
-# Web E2E
-e2e-web:
-	maestro test \
-		-e SERVER_URL=$(SERVER_URL) \
-		-e DEMO_EMAIL=$(DEMO_EMAIL) \
-		-e DEMO_APP_PASSWORD=$(DEMO_APP_PASSWORD) \
-		-p web --headless \
-		--format junit \
-		--output maestro-web-report.xml \
-		.maestro/ --include-tags web
-
 # iOS E2E (Simulator リセット + テスト)
 e2e-ios: erase-simulator
 	maestro test \
@@ -80,15 +77,11 @@ e2e-ios: erase-simulator
 		--output maestro-ios-report.xml \
 		.maestro/ --include-tags ios
 
-# Web + iOS 両方
-e2e: e2e-web e2e-ios
-
 # =============================================================================
-# CI (フル一括)
+# CI (フル一括: Unit + サーバー起動 + iOS E2E + 停止)
 # =============================================================================
 
-# Unit + Web E2E
-ci: test up e2e-web down
-
-# Unit + iOS E2E
-ci-ios: test up e2e-ios down
+ci: test
+	$(MAKE) up BG=1
+	$(MAKE) e2e-ios
+	$(MAKE) stop

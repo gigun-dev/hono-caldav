@@ -37,8 +37,7 @@ tags:
 - inputText: ${DEMO_APP_PASSWORD}
 
 - tapOn: 終了
-- tapOn: My text
-
+- tapOn: 保存
 
 # 接続確認を待つ
 - extendedWaitUntil:

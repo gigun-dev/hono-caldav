@@ -1,61 +1,13 @@
-import { env, SELF } from "cloudflare:test";
+import { env } from "cloudflare:test";
 import { describe, it, expect, beforeAll } from "vitest";
 import "../src/index";
-
-// --- Helpers ---
-
-const AUTH_A = "Basic " + btoa("admin:changeme");
-const AUTH_B = "Basic " + btoa("admin-b:changeme");
-
-function request(
-	method: string,
-	path: string,
-	auth: string,
-	opts: { body?: string; headers?: Record<string, string> } = {},
-) {
-	return SELF.fetch(`http://localhost${path}`, {
-		method,
-		headers: {
-			Authorization: auth,
-			...opts.headers,
-		},
-		body: opts.body,
-		redirect: "manual",
-	});
-}
-
-function makeVtodo(uid: string, summary: string): string {
-	return [
-		"BEGIN:VCALENDAR",
-		"VERSION:2.0",
-		"PRODID:-//Test//Test//EN",
-		"BEGIN:VTODO",
-		`UID:${uid}`,
-		`DTSTAMP:20250101T000000Z`,
-		`SUMMARY:${summary}`,
-		"STATUS:NEEDS-ACTION",
-		"END:VTODO",
-		"END:VCALENDAR",
-	].join("\r\n");
-}
-
-async function seedCalendar(
-	name: string,
-	componentType: string,
-	userId: string,
-): Promise<number> {
-	await env.DB.prepare(
-		"INSERT INTO calendars (user_id, name, component_type) VALUES (?, ?, ?)",
-	)
-		.bind(userId, name, componentType)
-		.run();
-	const row = await env.DB.prepare(
-		"SELECT id FROM calendars WHERE user_id = ? ORDER BY id DESC LIMIT 1",
-	)
-		.bind(userId)
-		.first<{ id: number }>();
-	return row!.id;
-}
+import {
+	AUTH_A,
+	AUTH_B,
+	request,
+	makeVtodo,
+	seedCalendar,
+} from "./helpers.js";
 
 // === Multi-user isolation ===
 
@@ -121,6 +73,24 @@ describe("Multi-user isolation", () => {
 			AUTH_B,
 		);
 		expect(res.status).toBe(404);
+	});
+
+	it("User B cannot DELETE User A's calendar", async () => {
+		const res = await request(
+			"DELETE",
+			`/dav/projects/${calIdA}`,
+			AUTH_B,
+		);
+		expect(res.status).toBe(404);
+
+		// Verify calendar still exists for User A
+		const checkRes = await request(
+			"PROPFIND",
+			`/dav/projects/${calIdA}/`,
+			AUTH_A,
+			{ headers: { Depth: "0" } },
+		);
+		expect(checkRes.status).toBe(207);
 	});
 
 	it("PROPFIND /dav/projects/ only shows own calendars", async () => {

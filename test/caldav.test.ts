@@ -1,78 +1,13 @@
-import { env, SELF } from "cloudflare:test";
+import { SELF } from "cloudflare:test";
 import { describe, it, expect, beforeAll } from "vitest";
 import "../src/index";
-
-// --- Helpers ---
-
-// App Password auth: email:app-password
-const AUTH = "Basic " + btoa("admin:changeme");
-const AUTH_BAD = "Basic " + btoa("admin:wrong-password");
-
-function request(
-	method: string,
-	path: string,
-	opts: { body?: string; headers?: Record<string, string> } = {},
-) {
-	return SELF.fetch(`http://localhost${path}`, {
-		method,
-		headers: {
-			Authorization: AUTH,
-			...opts.headers,
-		},
-		body: opts.body,
-		redirect: "manual",
-	});
-}
-
-function makeVtodo(uid: string, summary: string): string {
-	return [
-		"BEGIN:VCALENDAR",
-		"VERSION:2.0",
-		"PRODID:-//Test//Test//EN",
-		"BEGIN:VTODO",
-		`UID:${uid}`,
-		`DTSTAMP:20250101T000000Z`,
-		`SUMMARY:${summary}`,
-		"STATUS:NEEDS-ACTION",
-		"END:VTODO",
-		"END:VCALENDAR",
-	].join("\r\n");
-}
-
-function makeVevent(uid: string, summary: string): string {
-	return [
-		"BEGIN:VCALENDAR",
-		"VERSION:2.0",
-		"PRODID:-//Test//Test//EN",
-		"BEGIN:VEVENT",
-		`UID:${uid}`,
-		`DTSTAMP:20250101T000000Z`,
-		`DTSTART:20250115T090000Z`,
-		`DTEND:20250115T100000Z`,
-		`SUMMARY:${summary}`,
-		"END:VEVENT",
-		"END:VCALENDAR",
-	].join("\r\n");
-}
-
-/** Insert a test calendar and return its id */
-async function seedCalendar(
-	name: string,
-	componentType: string,
-	userId = "test-user-a",
-): Promise<number> {
-	await env.DB.prepare(
-		"INSERT INTO calendars (user_id, name, component_type) VALUES (?, ?, ?)",
-	)
-		.bind(userId, name, componentType)
-		.run();
-	const row = await env.DB.prepare(
-		"SELECT id FROM calendars WHERE user_id = ? ORDER BY id DESC LIMIT 1",
-	)
-		.bind(userId)
-		.first<{ id: number }>();
-	return row!.id;
-}
+import {
+	AUTH_BAD,
+	request,
+	makeVtodo,
+	makeVevent,
+	seedCalendar,
+} from "./helpers.js";
 
 // === 1. Authentication ===
 
@@ -897,5 +832,90 @@ describe("PROPFIND property filtering", () => {
 		expect(xml).toContain("<d:displayname>");
 		expect(xml).toContain("resourcetype");
 		expect(xml).toContain("getctag");
+	});
+});
+
+// === 15. DELETE calendar collection ===
+
+describe("DELETE calendar collection", () => {
+	it("deletes an empty calendar and returns 204", async () => {
+		const calId = await seedCalendar("Del Empty Cal", "VTODO");
+		const res = await request("DELETE", `/dav/projects/${calId}`);
+		expect(res.status).toBe(204);
+	});
+
+	it("deletes a calendar with objects and returns 204", async () => {
+		const calId = await seedCalendar("Del With Objects", "VTODO");
+		const ics = makeVtodo("del-cal-obj-1", "Will be deleted with calendar");
+		await request("PUT", `/dav/projects/${calId}/del-cal-obj-1.ics`, {
+			body: ics,
+			headers: { "Content-Type": "text/calendar" },
+		});
+
+		const res = await request("DELETE", `/dav/projects/${calId}`);
+		expect(res.status).toBe(204);
+
+		// Objects should also be gone
+		const getRes = await request("GET", `/dav/projects/${calId}/del-cal-obj-1.ics`);
+		expect(getRes.status).toBe(404);
+
+		// Calendar itself should be gone
+		const propRes = await request("PROPFIND", `/dav/projects/${calId}/`, {
+			headers: { Depth: "0" },
+		});
+		expect(propRes.status).toBe(404);
+	});
+
+	it("deleted calendar no longer appears in PROPFIND listing", async () => {
+		const calId = await seedCalendar("Del Listed Cal", "VTODO");
+
+		// Verify it appears first
+		const beforeRes = await request("PROPFIND", "/dav/projects/", {
+			headers: { Depth: "1" },
+		});
+		const beforeXml = await beforeRes.text();
+		expect(beforeXml).toContain("Del Listed Cal");
+
+		await request("DELETE", `/dav/projects/${calId}`);
+
+		const afterRes = await request("PROPFIND", "/dav/projects/", {
+			headers: { Depth: "1" },
+		});
+		const afterXml = await afterRes.text();
+		expect(afterXml).not.toContain("Del Listed Cal");
+	});
+
+	it("returns 404 for non-existent calendar", async () => {
+		const res = await request("DELETE", "/dav/projects/99999");
+		expect(res.status).toBe(404);
+	});
+
+	it("returns 401 without credentials", async () => {
+		const calId = await seedCalendar("Del Auth Test", "VTODO");
+		const res = await SELF.fetch(`http://localhost/dav/projects/${calId}`, {
+			method: "DELETE",
+		});
+		expect(res.status).toBe(401);
+	});
+
+	it("sync-collection returns 404 after calendar deletion", async () => {
+		const calId = await seedCalendar("Del Sync Cal", "VTODO");
+		const ics = makeVtodo("del-sync-1", "Sync then delete");
+		await request("PUT", `/dav/projects/${calId}/del-sync-1.ics`, {
+			body: ics,
+			headers: { "Content-Type": "text/calendar" },
+		});
+
+		await request("DELETE", `/dav/projects/${calId}`);
+
+		const syncBody = `<?xml version="1.0" encoding="UTF-8"?>
+<d:sync-collection xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:sync-token></d:sync-token>
+  <d:prop><d:getetag/></d:prop>
+</d:sync-collection>`;
+		const res = await request("REPORT", `/dav/projects/${calId}/`, {
+			body: syncBody,
+		});
+		expect(res.status).toBe(404);
 	});
 });
