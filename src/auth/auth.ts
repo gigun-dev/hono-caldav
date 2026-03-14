@@ -30,6 +30,9 @@ export function createAuth(env: CloudflareBindings, headers?: Headers) {
 		advanced: {
 			trustedProxyHeaders: true,
 		},
+		emailAndPassword: {
+			enabled: true,
+		},
 		socialProviders: {
 			google: {
 				clientId: env.GOOGLE_CLIENT_ID,
@@ -48,10 +51,6 @@ export function createAuth(env: CloudflareBindings, headers?: Headers) {
 		session: {
 			expiresIn: 60 * 60 * 24 * 7, // 7 days
 			updateAge: 60 * 60 * 24, // 24 hours
-			cookieCache: {
-				enabled: true,
-				maxAge: 60 * 5, // 5 minutes
-			},
 		},
 	});
 }

@@ -11,10 +11,10 @@ type AppPassword = {
 
 const PasswordRow: FC<{ pw: AppPassword }> = ({ pw }) => (
 	<tr id={`pw-${pw.id}`}>
-		<td>{pw.name}</td>
-		<td>{pw.prefix}****</td>
-		<td>{pw.created_at}</td>
-		<td>{pw.last_used_at ?? "-"}</td>
+		<td data-label="名前">{pw.name}</td>
+		<td data-label="Prefix">{pw.prefix}****</td>
+		<td data-label="作成日">{pw.created_at}</td>
+		<td data-label="最終使用">{pw.last_used_at ?? "-"}</td>
 		<td>
 			<button
 				class="btn-revoke"
@@ -43,7 +43,8 @@ const DashboardPage: FC<{
 	userName: string;
 	userEmail: string;
 	passwords: AppPassword[];
-}> = ({ userName, userEmail, passwords }) => (
+	isDemo?: boolean;
+}> = ({ userName, userEmail, passwords, isDemo }) => (
 	<html lang="ja">
 		<head>
 			<meta charset="UTF-8" />
@@ -55,29 +56,34 @@ const DashboardPage: FC<{
 				crossorigin="anonymous"
 			/>
 			<style>{`
+				* { box-sizing: border-box; }
 				body {
 					font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 					max-width: 800px;
 					margin: 0 auto;
-					padding: 2rem;
+					padding: 1rem;
 					background: #f5f5f5;
 				}
 				.header {
 					display: flex;
 					justify-content: space-between;
 					align-items: center;
-					margin-bottom: 2rem;
+					gap: 1rem;
+					margin-bottom: 1.5rem;
 				}
+				.header h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
 				.card {
 					background: white;
 					border-radius: 12px;
-					padding: 1.5rem;
+					padding: 1.25rem;
 					box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 					margin-bottom: 1.5rem;
+					overflow-x: auto;
 				}
+				.card h2 { font-size: 1.1rem; margin-top: 0; }
 				table { width: 100%; border-collapse: collapse; }
-				th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #eee; }
-				th { font-weight: 600; color: #666; }
+				th, td { padding: 0.6rem 0.5rem; text-align: left; border-bottom: 1px solid #eee; }
+				th { font-weight: 600; color: #666; font-size: 0.85rem; }
 				.btn {
 					padding: 0.5rem 1rem;
 					border: none;
@@ -87,14 +93,10 @@ const DashboardPage: FC<{
 				}
 				.btn-primary { background: #4285f4; color: white; }
 				.btn-primary:hover { background: #3367d6; }
-				.btn-danger { background: #dc3545; color: white; }
-				.btn-danger:hover { background: #c82333; }
-				.btn-revoke { background: #dc3545; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; }
+				.btn-revoke { background: #dc3545; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
 				.btn-revoke:hover { background: #c82333; }
-				.btn-logout { background: none; border: 1px solid #ccc; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
+				.btn-logout { background: none; border: 1px solid #ccc; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 				.btn-logout:hover { background: #eee; }
-				.form-group { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-				.form-group input { flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; }
 				.new-password {
 					background: #e8f5e9;
 					padding: 1rem;
@@ -102,7 +104,7 @@ const DashboardPage: FC<{
 					margin-top: 1rem;
 					word-break: break-all;
 					font-family: monospace;
-					font-size: 1.1rem;
+					font-size: 1rem;
 				}
 				.info { color: #666; font-size: 0.85rem; margin-top: 0.5rem; }
 				.caldav-info {
@@ -115,10 +117,68 @@ const DashboardPage: FC<{
 					background: #bbdefb;
 					padding: 0.15rem 0.3rem;
 					border-radius: 3px;
+					word-break: break-all;
+				}
+				.caldav-info p { margin: 0.5rem 0; }
+				.demo-banner {
+					background: #fff3cd;
+					border: 1px solid #ffc107;
+					border-radius: 8px;
+					padding: 0.75rem 1rem;
+					margin-bottom: 1.5rem;
+					text-align: center;
+					font-size: 0.9rem;
+				}
+				.demo-banner a {
+					color: #4285f4;
+					margin-left: 0.5rem;
+				}
+
+				/* --- Mobile: table → card list --- */
+				@media (max-width: 600px) {
+					body { padding: 0.75rem; }
+					.header { flex-direction: column; align-items: flex-start; }
+					.header h1 { font-size: 1.2rem; }
+
+					table, thead, tbody, th, td, tr {
+						display: block;
+					}
+					thead { display: none; }
+					tr {
+						background: #fafafa;
+						border: 1px solid #eee;
+						border-radius: 8px;
+						padding: 0.75rem;
+						margin-bottom: 0.75rem;
+					}
+					td {
+						padding: 0.25rem 0;
+						border: none;
+						display: flex;
+						justify-content: space-between;
+						font-size: 0.9rem;
+					}
+					td::before {
+						content: attr(data-label);
+						font-weight: 600;
+						color: #666;
+						margin-right: 0.5rem;
+						flex-shrink: 0;
+					}
+					td:last-child {
+						justify-content: flex-end;
+						padding-top: 0.5rem;
+					}
 				}
 			`}</style>
 		</head>
 		<body>
+			{isDemo && (
+				<div class="demo-banner">
+					デモ環境です。データは定期的にリセットされます。
+					<a href="/login">本番アカウントを作成 →</a>
+				</div>
+			)}
 			<div class="header">
 				<div>
 					<h1>CalDAV Dashboard</h1>
@@ -180,7 +240,10 @@ const DashboardPage: FC<{
 			{html`
 				<script>
 					document.getElementById('logout-btn').addEventListener('click', async () => {
-						await fetch('/api/auth/sign-out', { method: 'POST' });
+						await fetch('/api/auth/sign-out', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+						});
 						window.location.href = '/login';
 					});
 				</script>

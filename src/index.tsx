@@ -12,6 +12,8 @@ import { authGuard } from "./middleware/auth-guard.js";
 import { registerCaldavRoutes } from "./caldav/handlers.js";
 import LoginPage from "./pages/login.js";
 import DashboardPage from "./pages/dashboard.js";
+import { handleDemo } from "./demo/handler.js";
+import { cleanupDemoUsers } from "./demo/cleanup.js";
 
 const app = new Hono<AppBindings>();
 
@@ -29,15 +31,21 @@ app.get("/login", (c) => {
 	return c.html(<LoginPage />);
 });
 
+// --- Demo mode ---
+app.get("/demo", handleDemo);
+
 // --- Dashboard (session protected) ---
 app.get("/dashboard", authGuard, async (c) => {
 	const user = c.get("user");
 	const passwords = await listAppPasswords(c.env.DB, user.id);
+	const demoEmail = c.env.DEMO_EMAIL;
+	const isDemo = user.username.endsWith("@demo.caldav.local") || (demoEmail != null && user.username === demoEmail);
 	return c.html(
 		<DashboardPage
 			userName={user.displayName ?? user.username}
 			userEmail={user.username}
 			passwords={passwords}
+			isDemo={isDemo}
 		/>,
 	);
 });
@@ -51,8 +59,7 @@ app.post("/api/app-passwords", authGuard, async (c) => {
 	return c.html(
 		<div class="new-password">
 			<strong>App Password (一度だけ表示):</strong>
-			<br />
-			{result.password}
+			<code id="generated-password-value">{result.password}</code>
 			<p class="info">
 				この値をコピーして CalDAV クライアントに設定してください。再表示できません。
 			</p>
@@ -102,3 +109,13 @@ app.on("PROPFIND", "/", caldavAuth);
 registerCaldavRoutes(app);
 
 export default app;
+
+// Cron Trigger handler for demo user cleanup
+export async function scheduled(
+	_event: ScheduledEvent,
+	env: CloudflareBindings,
+	_ctx: ExecutionContext,
+) {
+	const result = await cleanupDemoUsers(env.DB);
+	console.log(`[Cron] Cleaned up ${result.deleted} demo users`);
+}

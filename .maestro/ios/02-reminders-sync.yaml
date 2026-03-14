@@ -1,0 +1,31 @@
+appId: com.apple.reminders
+tags:
+  - ios
+---
+# リマインダーアプリでデモタスクの同期を確認
+# 事前条件: 01 で CalDAV アカウント追加済み
+
+- launchApp:
+    clearState: false
+
+# 初回起動ダイアログ
+- tapOn: 続ける
+- tapOn: 今はしない
+
+# デモデータの VTODO カレンダーが表示される
+- assertVisible: 仕事
+- assertVisible: プライベート
+
+# 仕事カレンダーのタスクを確認
+- tapOn: 仕事
+- assertVisible: 週次レポート作成
+- assertVisible: クライアントMTG準備
+- assertVisible: コードレビュー
+
+- back
+
+# プライベートカレンダーのタスクを確認
+- tapOn: プライベート
+- assertVisible: スーパーで買い物
+- assertVisible: ジムに行く
+- assertVisible: 本を読む

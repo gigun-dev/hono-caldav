@@ -1,0 +1,13 @@
+appId: com.android.chrome
+tags:
+  - web
+---
+# ダッシュボードの CalDAV 接続情報が正しく表示される
+
+- openLink: ${SERVER_URL}/demo
+
+- assertVisible: CalDAV Dashboard
+- assertVisible: CalDAV 接続情報
+- assertVisible: /dav/projects/
+- assertVisible: ${DEMO_EMAIL}
+- assertVisible: App Password

@@ -28,36 +28,61 @@ const LoginPage: FC = () => (
 				}
 				h1 { margin-bottom: 0.5rem; }
 				p { color: #666; margin-bottom: 1.5rem; }
-				.btn-google {
+				.btn {
 					display: inline-flex;
 					align-items: center;
+					justify-content: center;
 					gap: 0.5rem;
 					padding: 0.75rem 1.5rem;
-					background: #4285f4;
 					color: white;
 					border: none;
 					border-radius: 8px;
 					font-size: 1rem;
 					cursor: pointer;
+					width: 100%;
 					text-decoration: none;
+					box-sizing: border-box;
 				}
+				.btn-google { background: #4285f4; }
 				.btn-google:hover { background: #3367d6; }
+				.btn-demo {
+					background: #6c757d;
+					margin-top: 0;
+				}
+				.btn-demo:hover { background: #545b62; }
+				.divider {
+					display: flex;
+					align-items: center;
+					margin: 1.5rem 0;
+					color: #999;
+					font-size: 0.85rem;
+				}
+				.divider::before, .divider::after {
+					content: '';
+					flex: 1;
+					border-bottom: 1px solid #ddd;
+				}
+				.divider::before { margin-right: 0.5rem; }
+				.divider::after { margin-left: 0.5rem; }
 			`}</style>
 		</head>
 		<body>
 			<div class="card">
 				<h1>CalDAV Server</h1>
-				<p>Google アカウントでログインして App Password を管理</p>
-				<button
-					class="btn-google"
-					id="login-btn"
-				>
+				<p>ログインして App Password を管理</p>
+
+				<button class="btn btn-google" id="google-btn">
 					Google でログイン
 				</button>
+
+				<div class="divider">or</div>
+				<a href="/demo" class="btn btn-demo">
+					デモを試す（ログイン不要）
+				</a>
 			</div>
 			{html`
 				<script>
-					document.getElementById('login-btn').addEventListener('click', async () => {
+					document.getElementById('google-btn').addEventListener('click', async () => {
 						const res = await fetch('/api/auth/sign-in/social', {
 							method: 'POST',
 							headers: { 'Content-Type': 'application/json' },

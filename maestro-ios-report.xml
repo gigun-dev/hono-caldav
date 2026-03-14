@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="iPhone 16e - iOS 26.3 - 49E821BF-7B6E-4E63-9C0B-8112AD642EF2" tests="3" failures="3" time="84.0">
+    <testcase id="01-caldav-account-add" name="01-caldav-account-add" classname="01-caldav-account-add" time="44.0" status="ERROR">
+      <properties>
+        <property name="tags" value="ios"/>
+      </properties>
+      <failure>Element not found: Text matching regex: その他のアカウントを追加…</failure>
+    </testcase>
+    <testcase id="03-calendar-sync" name="03-calendar-sync" classname="03-calendar-sync" time="22.0" status="ERROR">
+      <properties>
+        <property name="tags" value="ios"/>
+      </properties>
+      <failure>Assertion is false: "スケジュール" is visible</failure>
+    </testcase>
+    <testcase id="02-reminders-sync" name="02-reminders-sync" classname="02-reminders-sync" time="18.0" status="ERROR">
+      <properties>
+        <property name="tags" value="ios"/>
+      </properties>
+      <failure>Element not found: Text matching regex: 続ける</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

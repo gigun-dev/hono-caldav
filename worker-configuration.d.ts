@@ -12,6 +12,9 @@ declare namespace Cloudflare {
 		BETTER_AUTH_SECRET: string;
 		GOOGLE_CLIENT_ID: string;
 		GOOGLE_CLIENT_SECRET: string;
+		DEMO_EMAIL?: string;
+		DEMO_PASSWORD?: string;
+		DEMO_APP_PASSWORD?: string;
 	}
 }
 interface CloudflareBindings extends Cloudflare.Env {}

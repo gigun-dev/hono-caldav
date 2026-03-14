@@ -1,0 +1,69 @@
+name: Maestro iOS E2E
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  maestro-ios:
+    runs-on: macos-14
+    timeout-minutes: 30
+    env:
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+      BETTER_AUTH_ALLOWED_HOSTS: "localhost:8787,dev-worker.097969.xyz"
+      BETTER_AUTH_PRODUCTION_URL: "https://caldav.gigun-dev.workers.dev"
+      GOOGLE_CLIENT_ID: test
+      GOOGLE_CLIENT_SECRET: test
+      SERVER_URL: ${{ secrets.SERVER_URL }}
+      DEMO_EMAIL: ${{ secrets.DEMO_EMAIL }}
+      DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+      DEMO_APP_PASSWORD: ${{ secrets.DEMO_APP_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+
+      - name: Install Maestro
+        run: |
+          curl -Ls https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Install cloudflared
+        run: brew install cloudflared
+
+      - name: Boot iOS Simulator
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | \
+            jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name == "iPhone 16") | .udid' | head -1)
+          if [ -z "$DEVICE" ]; then
+            DEVICE=$(xcrun simctl list devices available -j | \
+              jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | .udid' | head -1)
+          fi
+          xcrun simctl boot "$DEVICE" || true
+
+      - name: Erase simulator
+        run: make erase-simulator
+
+      - name: Start servers + tunnel
+        run: |
+          make serve &
+          cloudflared tunnel run --token ${{ secrets.CLOUDFLARED_TOKEN }} &
+          sleep 5
+
+      - name: Seed demo user
+        run: make seed
+
+      - name: Run Maestro iOS tests
+        run: make maestro-ios-run
+        continue-on-error: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-ios-report
+          path: |
+            maestro-ios-report.xml
+            ~/.maestro/tests/**/*

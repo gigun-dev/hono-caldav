@@ -1,0 +1,16 @@
+appId: com.android.chrome
+tags:
+  - web
+---
+# ログアウトフロー
+
+- openLink: ${SERVER_URL}/demo
+
+- assertVisible: CalDAV Dashboard
+
+- tapOn: ログアウト
+
+# ログインページに戻る
+- assertVisible: CalDAV Server
+- assertVisible: Google でログイン
+- assertVisible: デモを試す（ログイン不要）

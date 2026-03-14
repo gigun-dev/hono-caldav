@@ -15,6 +15,9 @@
 		"BETTER_AUTH_ALLOWED_HOSTS": "caldav.gigun-dev.workers.dev,*-caldav.gigun-dev.workers.dev",
 		"BETTER_AUTH_PRODUCTION_URL": "https://caldav.gigun-dev.workers.dev",
 	},
+	"triggers": {
+		"crons": ["0 * * * *"],
+	},
 	"observability": {
 		"enabled": true,
 		"head_sampling_rate": 1,

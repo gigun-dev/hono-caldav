@@ -4,6 +4,7 @@ import type { AppBindings } from "../types.js";
 import { isValidComponent } from "./ical.js";
 import {
 	createCalendar,
+	deleteCalendar,
 	deleteObject,
 	getCalendarById,
 	getCalendarsForUser,
@@ -533,6 +534,17 @@ export function registerCaldavRoutes(app: Hono<AppBindings>) {
 			ETag: object.etag,
 			"Content-Type": "text/calendar; charset=utf-8",
 		});
+	});
+
+	// DELETE calendar collection
+	app.delete("/dav/projects/:projectId", async (c) => {
+		const user = c.get("user");
+		const calendarId = Number(c.req.param("projectId"));
+		const deleted = await deleteCalendar(c.env.DB, user.id, calendarId);
+		if (!deleted) {
+			return c.text("Calendar not found", 404);
+		}
+		return c.body(null, 204);
 	});
 
 	// DELETE object
