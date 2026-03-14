@@ -35,6 +35,14 @@ export type CalendarChange = {
 	operation: 1 | 2 | 3; // 1=add, 2=update, 3=delete
 };
 
+export type UserDefaultCalendars = {
+	userId: string;
+	taskListCalendarId: number;
+	eventCalendarId: number;
+	createdAt: string;
+	updatedAt: string;
+};
+
 // --- Calendar CRUD ---
 
 export async function getCalendarsForUser(
@@ -79,6 +87,61 @@ export async function createCalendar(
 		.bind(userId, name, componentType, color ?? null, calendarOrder ?? null)
 		.first();
 	return rowToCalendar(result as Record<string, unknown>);
+}
+
+/**
+ * 初回 cron 用: ユーザーにサーバー専用のカレンダー・リストがなければ作成し、ID を user_default_calendars に保存する。
+ * - VTODO「メールから」: Gmail 抽出タスク用リスト
+ * - VEVENT「予定」: イベント用カレンダー
+ */
+export async function ensureDefaultCalendarsForUser(
+	db: D1Database,
+	userId: string,
+): Promise<UserDefaultCalendars> {
+	const existing = await getDefaultCalendarsForUser(db, userId);
+	if (existing) return existing;
+
+	const taskList = await createCalendar(
+		db,
+		userId,
+		"メールから",
+		"VTODO",
+		"#4ECDC4",
+		0,
+	);
+	const eventCal = await createCalendar(
+		db,
+		userId,
+		"予定",
+		"VEVENT",
+		"#45B7D1",
+		1,
+	);
+	await db
+		.prepare(
+			"INSERT INTO user_default_calendars (user_id, task_list_calendar_id, event_calendar_id) VALUES (?, ?, ?)",
+		)
+		.bind(userId, taskList.id, eventCal.id)
+		.run();
+	const created = await getDefaultCalendarsForUser(db, userId);
+	if (!created) throw new Error("user_default_calendars: row not found after insert");
+	return created;
+}
+
+/**
+ * user_default_calendars からユーザーのサーバー専用カレンダー・リスト ID を取得する。
+ */
+export async function getDefaultCalendarsForUser(
+	db: D1Database,
+	userId: string,
+): Promise<UserDefaultCalendars | null> {
+	const row = await db
+		.prepare(
+			"SELECT user_id, task_list_calendar_id, event_calendar_id, created_at, updated_at FROM user_default_calendars WHERE user_id = ?",
+		)
+		.bind(userId)
+		.first();
+	return row ? rowToUserDefaultCalendars(row as Record<string, unknown>) : null;
 }
 
 export async function updateCalendarDisplayName(
@@ -317,5 +380,17 @@ function rowToChange(row: Record<string, unknown>): CalendarChange {
 		uri: row.uri as string,
 		synctoken: row.synctoken as number,
 		operation: row.operation as 1 | 2 | 3,
+	};
+}
+
+function rowToUserDefaultCalendars(
+	row: Record<string, unknown>,
+): UserDefaultCalendars {
+	return {
+		userId: row.user_id as string,
+		taskListCalendarId: row.task_list_calendar_id as number,
+		eventCalendarId: row.event_calendar_id as number,
+		createdAt: row.created_at as string,
+		updatedAt: row.updated_at as string,
 	};
 }

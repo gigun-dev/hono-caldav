@@ -54,4 +54,27 @@ export interface ExtractedEvent {
 	}
 	events: ExtractedEvent[]
   }
-  
+
+  /** タスク抽出AIが返す「予定」1件（VEVENT 用） */
+  export interface ExtractedScheduleEvent {
+	date: string        // YYYY-MM-DD
+	startTime?: string  // HH:mm
+	endTime?: string    // HH:mm
+	title: string
+	location?: string | null
+	description?: string | null
+  }
+
+  /** タスク抽出AIが返す「タスク」1件（VTODO 用） */
+  export interface ExtractedScheduleTask {
+	date: string        // YYYY-MM-DD または YYYY-MM-DDTHH:mm
+	title: string
+	location?: string | null
+	description?: string | null
+  }
+
+  /** タスク抽出AIの JSON 出力（予定とタスクを分別）。従来の tasks のみの形式にも対応。 */
+  export interface ScheduleExtractionResult {
+	events?: ExtractedScheduleEvent[]
+	tasks?: ExtractedScheduleTask[]
+  }
