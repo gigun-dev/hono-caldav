@@ -55,6 +55,25 @@ app.get('/poll', async (c) => {
 
         const extracted = await extractor.extractFromFeed(item)
         console.log('--- extractFromFeed 結果 ---\n', extracted ?? '(null)')
+
+        // 抽出したタスクをコンソール出力
+        if (extracted) {
+          try {
+            const parsed = JSON.parse(extracted) as { tasks?: Array<{ date?: string; title?: string; location?: string; description?: string }> }
+            const tasks = parsed?.tasks ?? []
+            console.log(`[cron/poll][${item.userId}] 抽出タスク数: ${tasks.length}`)
+            tasks.forEach((t, i) => {
+              console.log(`  タスク ${i + 1}:`, {
+                date: t.date ?? '(なし)',
+                title: t.title ?? '(なし)',
+                location: t.location ?? null,
+                description: t.description ? (t.description.length > 80 ? t.description.slice(0, 80) + '...' : t.description) : null,
+              })
+            })
+          } catch {
+            // JSON パース失敗時は生文字列のまま表示済み
+          }
+        }
         // TODO: extracted + item.userId → RssItem 変換 → sendWebhook
         processed++
       }
