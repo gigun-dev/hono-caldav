@@ -14,6 +14,7 @@ import LoginPage from "./pages/login.js";
 import DashboardPage from "./pages/dashboard.js";
 import { handleDemo, handleDemoSeed } from "./demo/handler.js";
 import { cleanupDemoUsers } from "./demo/cleanup.js";
+import cronRoute from "./routes/cron.js";
 
 const app = new Hono<AppBindings>();
 
@@ -83,6 +84,9 @@ app.post("/api/app-passwords/:id/revoke", authGuard, async (c) => {
 	// Return empty string to remove the row via hx-swap="outerHTML"
 	return c.body(null, 200);
 });
+
+// --- Cron (e.g. GET /cron/poll for local testing) ---
+app.route("/cron", cronRoute);
 
 // --- Debug middleware for CalDAV ---
 app.use("/dav/*", async (c, next) => {
