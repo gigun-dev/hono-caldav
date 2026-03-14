@@ -1,0 +1,17 @@
+# ローカル開発用。コピーして .dev.vars を作成し、値を設定してください。
+# .dev.vars は git に含めないこと。
+
+# CalDAV Basic 認証（wrangler が vars にマージ）
+# CALDAV_USERNAME=
+# CALDAV_PASSWORD=
+
+# Gmail ポーリング（cron 用）
+# GOOGLE_REFRESH_TOKEN=
+# GMAIL_USER_EMAIL=
+
+# cron の LLM スケジュール抽出（Groq デフォルト）
+API_KEY=
+# 従来の名前も利用可能: GROQ_API_KEY= / OPENAI_API_KEY=
+# 未設定時: baseURL=https://api.groq.com/openai/v1, model=llama-3.1-8b-instant
+# OPENAI_BASE_URL=
+# SCHEDULE_EXTRACT_MODEL=
