@@ -41,6 +41,8 @@ export function createAuth(env: CloudflareBindings, headers?: Headers) {
 				accessType: "offline",
 				prompt: "consent",
 				redirectURI: `${env.BETTER_AUTH_PRODUCTION_URL}/api/auth/callback/google`,
+				// Gmail API 用。D1 account の refresh token で cron/Gmail ポーリングするために必要。
+				scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
 			},
 		},
 		plugins: [
