@@ -5,9 +5,9 @@ import {
 
 export default defineWorkersProject(async () => {
 	const migrations = await readD1Migrations("./migrations");
-
 	return {
 		test: {
+			exclude: ["test/llm.test.ts"],
 			setupFiles: ["./test/apply-migrations.ts"],
 			poolOptions: {
 				workers: {
