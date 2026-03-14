@@ -1,7 +1,6 @@
 flows:
   - web/*
   - ios/*
-
 # env: block doesn't work in Maestro 2.x (known bug)
 # Use -e flag instead: maestro test -e SERVER_URL=https://dev-worker.097969.xyz
 # env:

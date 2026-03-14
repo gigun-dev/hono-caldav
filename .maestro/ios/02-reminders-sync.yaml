@@ -12,6 +12,9 @@ tags:
 - tapOn: 続ける
 - tapOn: 今はしない
 
+- tapOn:
+    id: BackButton
+
 # デモデータの VTODO カレンダーが表示される
 - assertVisible: 仕事
 - assertVisible: プライベート

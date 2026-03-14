@@ -98,6 +98,14 @@ bun run dev  # DB ファイルが再作成される
 bun run db:migrate:local
 ```
 
+**TablePlus などでローカル D1 を開く**: `.wrangler` 内の SQLite はパスが長いため、`local-d1.sqlite` を gitignore している。固定パスで開きたい場合は、一度 `bun run dev` で `.wrangler` を作ったあと:
+
+```sh
+ln -sf "$(find .wrangler/state/v3/d1 -name '*.sqlite' | head -1)" local-d1.sqlite
+```
+
+で symlink を作成してから TablePlus で `local-d1.sqlite` を開く。
+
 ## デプロイ
 
 ```sh

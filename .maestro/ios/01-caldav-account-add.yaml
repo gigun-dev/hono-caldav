@@ -38,9 +38,3 @@ tags:
 
 - tapOn: 終了
 - tapOn: 保存
-
-# 接続確認を待つ
-- extendedWaitUntil:
-    visible: 保存
-    timeout: 15000
-- tapOn: 保存
