@@ -18,7 +18,15 @@
 	},
 	"env": {
 		"production": {
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "hono-caldav",
+					"database_id": "256b87d7-86a1-400b-a19d-004796e611d2",
+				},
+			],
 			"vars": {
+				"SERVER_URL": "https://caldav.gigun-dev.workers.dev",
 				"BETTER_AUTH_ALLOWED_HOSTS": "caldav.gigun-dev.workers.dev,*-caldav.gigun-dev.workers.dev",
 				"BETTER_AUTH_PRODUCTION_URL": "https://caldav.gigun-dev.workers.dev",
 			},

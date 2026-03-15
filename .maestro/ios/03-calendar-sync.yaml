@@ -5,6 +5,8 @@ tags:
 # カレンダーアプリでデモイベントの同期を確認
 # 事前条件: 01 で CalDAV アカウント追加済み
 
+- startRecording: "03-calendar-sync.mp4"
+
 - launchApp:
     clearState: false
 
@@ -32,3 +34,5 @@ tags:
 # デモの繰り返しイベントが存在する
 - assertVisible: チームスタンドアップ
 - assertVisible: 1on1ミーティング
+
+- stopRecording
