@@ -24,8 +24,10 @@ tags:
     text: ${MAESTRO_L_ALLOW}
     optional: true
 
-# Demo VTODO calendars should be visible
-- assertVisible: 仕事
+# Demo VTODO calendars should be visible (wait for sync)
+- extendedWaitUntil:
+    visible: 仕事
+    timeout: 30000
 - assertVisible: プライベート
 
 # Check tasks in 仕事 calendar
