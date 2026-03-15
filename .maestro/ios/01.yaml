@@ -32,6 +32,10 @@ env:
         id: ACCOUNTS
 
 # Accounts exist: navigate via ACCOUNTS → ADD_ACCOUNT
+- extendedWaitUntil:
+    visible:
+      id: ACCOUNTS
+    timeout: 15000
 - tapOn:
     id: ACCOUNTS
 - tapOn:
