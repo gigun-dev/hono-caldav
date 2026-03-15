@@ -1,10 +1,8 @@
-.PHONY: test up stop seed-db reset-db erase-simulator e2e-ios ci
+.PHONY: test up stop reset-db seed-db erase-simulator e2e-ios ci
 
 -include .env
 -include .env.e2e
 export
-
-D1_DB = $(shell find .wrangler/state/v3/d1 -name '*.sqlite' 2>/dev/null | head -1)
 
 # =============================================================================
 # Server Management
@@ -13,17 +11,24 @@ D1_DB = $(shell find .wrangler/state/v3/d1 -name '*.sqlite' 2>/dev/null | head -
 # サーバー起動 (BG=1 で CI 用バックグラウンドモード)
 #   make up     → ログ表示、Ctrl+C で全停止
 #   make up BG=1 → 全バックグラウンド (CI 用)
-up: stop reset-db seed-db
+#
+# wrangler を1回だけ起動し、起動中に migrate → seed → そのまま稼働
+up:
+	@$(MAKE) stop 2>/dev/null || true
+	@rm -rf .wrangler/state/v3/d1
 	@cloudflared tunnel run --token $(CLOUDFLARED_TOKEN) > /dev/null 2>&1 &
+	@bun run dev:proxy > /dev/null 2>&1 &
+	@bun run dev > /dev/null 2>&1 &
+	@for i in $$(seq 1 30); do curl -s http://localhost:8787/ > /dev/null 2>&1 && break; sleep 1; done
+	@yes | bun run db:migrate:local > /dev/null 2>&1
+	@D1=$$(find .wrangler/state/v3/d1 -name '*.sqlite' 2>/dev/null | head -1); \
+	./scripts/seed-e2e.sh "$$D1"
+	@curl -s -X POST -u "$(MAESTRO_DEMO_EMAIL):$(MAESTRO_DEMO_APP_PASSWORD)" http://localhost:8787/demo/seed > /dev/null
 	@if [ "$(BG)" = "1" ]; then \
-		bun run dev:proxy > /dev/null 2>&1 & \
-		bun run dev > /dev/null 2>&1 & \
-		for i in $$(seq 1 30); do curl -s http://localhost:8787/ > /dev/null 2>&1 && break; sleep 1; done; \
-		curl -s -X POST -u "$(MAESTRO_DEMO_EMAIL):$(MAESTRO_DEMO_APP_PASSWORD)" http://localhost:8787/demo/seed > /dev/null; \
 		echo "Server ready (background)"; \
 	else \
+		$(MAKE) stop; \
 		bun run dev:proxy & \
-		(sleep 5 && curl -s -X POST -u "$(MAESTRO_DEMO_EMAIL):$(MAESTRO_DEMO_APP_PASSWORD)" http://localhost:8787/demo/seed > /dev/null && echo "[make] Demo data seeded") & \
 		trap 'pkill -f "wrangler dev" 2>/dev/null; pkill -f "bun run proxy" 2>/dev/null; pkill -f "cloudflared tunnel" 2>/dev/null; echo "\nAll services stopped"; exit 0' INT TERM; \
 		echo "Starting wrangler dev... (Ctrl+C to stop all)"; \
 		bun run dev; \
@@ -35,7 +40,7 @@ stop:
 	@pkill -f "bun run proxy" 2>/dev/null || true
 	@pkill -f "cloudflared tunnel" 2>/dev/null || true
 
-# DB リセット + マイグレーション
+# DB リセット + マイグレーション (独立実行用)
 reset-db:
 	rm -rf .wrangler/state/v3/d1
 	@bun run dev &
@@ -44,9 +49,10 @@ reset-db:
 	@pkill -f "wrangler dev" || true
 	@echo "DB reset complete"
 
-# E2E 用デモデータを sqlite3 で直接 seed
+# E2E 用デモデータを sqlite3 で直接 seed (独立実行用)
 seed-db:
-	@./scripts/seed-e2e.sh $(D1_DB)
+	@D1=$$(find .wrangler/state/v3/d1 -name '*.sqlite' 2>/dev/null | head -1); \
+	./scripts/seed-e2e.sh "$$D1"
 
 # =============================================================================
 # Testing
