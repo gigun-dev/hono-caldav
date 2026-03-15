@@ -5,7 +5,7 @@ tags:
 # リマインダーアプリでデモタスクの同期を確認
 # 事前条件: 01 で CalDAV アカウント追加済み
 
-- startRecording: "02-reminders-sync.mp4"
+- startRecording: "02-reminders-sync"
 
 - launchApp:
     clearState: false
