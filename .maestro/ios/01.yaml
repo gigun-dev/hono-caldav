@@ -7,6 +7,8 @@ env:
 # 設定 → CalDAV アカウント追加
 # MAESTRO_DEMO_EMAIL, MAESTRO_DEMO_APP_PASSWORD は .env.e2e から自動読み取り
 
+- startRecording: "01-account-setup.mp4"
+
 - launchApp:
     clearState: false
 
@@ -52,3 +54,5 @@ env:
 - tapOn: 次へ
 - tapOn: 保存
 - assertVisible: "カレンダーアカウント、2"
+
+- stopRecording
