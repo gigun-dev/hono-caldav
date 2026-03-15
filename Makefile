@@ -74,7 +74,7 @@ else
 	plutil -replace AppleLanguages -json '["en"]' $(PREFS_PLIST)
 	plutil -replace AppleLocale -string en_US $(PREFS_PLIST)
 endif
-	xcrun simctl boot $(DEVICE_UDID)
+	xcrun simctl bootstatus $(DEVICE_UDID) -b
 	@echo "Simulator erased and booted: $(LOCALE) ($(DEVICE_UDID))"
 
 # =============================================================================
