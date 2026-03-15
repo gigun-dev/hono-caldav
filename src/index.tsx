@@ -40,12 +40,14 @@ app.get("/dashboard", authGuard, async (c) => {
 	const user = c.get("user");
 	const passwords = await listAppPasswords(c.env.DB, user.id);
 	const isDemo = user.username.endsWith("@demo.caldav.local");
+	const hostname = new URL(c.req.url).hostname;
 	return c.html(
 		<DashboardPage
 			userName={user.displayName ?? user.username}
 			userEmail={user.username}
 			passwords={passwords}
 			isDemo={isDemo}
+			serverUrl={`https://${hostname}`}
 		/>,
 	);
 });

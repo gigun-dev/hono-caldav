@@ -14,14 +14,12 @@
  *   <branch>-caldav.gigun-dev.workers.dev → preview
  */
 
-const LOCAL_TARGET = process.env.LOCAL_TARGET ?? "http://localhost:8787";
-
 function getTargetUrl(req: Request, url: URL): string {
 	const host = req.headers.get("host") ?? "";
 	if (host.endsWith(".workers.dev")) {
 		return `https://${host}${url.pathname}${url.search}`;
 	}
-	return `${LOCAL_TARGET}${url.pathname}${url.search}`;
+	return `http://localhost:8787${url.pathname}${url.search}`;
 }
 
 const server = Bun.serve({
@@ -43,15 +41,7 @@ const server = Bun.serve({
 			);
 		}
 
-		const originalHost = headers.get("host") ?? "";
-		console.log(`[proxy] ${method} ${url.pathname} Host:${originalHost} XFH:${headers.get("X-Forwarded-Host")} XFP:${headers.get("X-Forwarded-Proto")}`);
-		if (!headers.has("X-Forwarded-Host")) {
-			headers.set("X-Forwarded-Host", originalHost);
-		}
-		if (!headers.has("X-Forwarded-Proto")) {
-			headers.set("X-Forwarded-Proto", url.protocol.replace(":", ""));
-		}
-		headers.delete("host");
+		console.log(`[proxy] ${method} ${url.pathname} Host:${headers.get("host")}`);
 
 		const resp = await fetch(targetUrl, {
 			method: fetchMethod,
@@ -68,6 +58,4 @@ const server = Bun.serve({
 });
 
 console.log(`[proxy] Listening on http://localhost:${server.port}`);
-console.log(`[proxy] Local fallback: ${LOCAL_TARGET}`);
-console.log(`[proxy] Remote: Host *.workers.dev → https://{host}`);
 console.log(`[proxy] Rewriting: MKCALENDAR → POST + X-Caldav-Method`);

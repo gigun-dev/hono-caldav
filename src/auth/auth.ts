@@ -9,8 +9,7 @@ export type CaldavUser = {
 };
 
 function resolveCurrentURL(headers: Headers): string | undefined {
-	const host =
-		headers.get("x-forwarded-host") ?? headers.get("host") ?? undefined;
+	const host = headers.get("host") ?? undefined;
 	if (!host) return undefined;
 	const proto = headers.get("x-forwarded-proto") ?? "http";
 	return `${proto}://${host}`;

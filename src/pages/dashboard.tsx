@@ -44,7 +44,8 @@ const DashboardPage: FC<{
 	userEmail: string;
 	passwords: AppPassword[];
 	isDemo?: boolean;
-}> = ({ userName, userEmail, passwords, isDemo }) => (
+	serverUrl: string;
+}> = ({ userName, userEmail, passwords, isDemo, serverUrl }) => (
 	<html lang="ja">
 		<head>
 			<meta charset="UTF-8" />
@@ -196,7 +197,7 @@ const DashboardPage: FC<{
 				<div class="caldav-info">
 					<p>
 						<strong>サーバー URL:</strong>{" "}
-						<code>/dav/projects/</code>
+						<code>{serverUrl}</code>
 					</p>
 					<p>
 						<strong>ユーザー名:</strong> <code>{userEmail}</code>
