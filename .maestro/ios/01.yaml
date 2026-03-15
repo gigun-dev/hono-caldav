@@ -5,6 +5,8 @@ env:
   SERVER_URL: https://workers-ci.097969.xyz
 ---
 # Settings → CalDAV account setup
+# Prerequisite: erase-simulator has seeded a subscribed calendar via DB INSERT
+#   so that "Calendar Accounts" (ACCOUNTS) section is visible.
 # MAESTRO_DEMO_EMAIL, MAESTRO_DEMO_APP_PASSWORD are auto-read from .env.e2e
 
 - startRecording: "01-account-setup"
@@ -14,6 +16,7 @@ env:
 
 - scrollUntilVisible:
     element: ${MAESTRO_L_APPS}
+    timeout: 30000
 - tapOn:
     id: com.apple.settings.apps
 
@@ -24,14 +27,7 @@ env:
 - tapOn:
     id: com.apple.mobilecal
 
-# No accounts: ADD_ACCOUNT shown directly → add subscribed calendar first
-- runFlow:
-    file: helpers/add-holiday-calendar.yaml
-    when:
-      notVisible:
-        id: ACCOUNTS
-
-# Accounts exist: navigate via ACCOUNTS → ADD_ACCOUNT
+# ACCOUNTS exists (seeded by erase-simulator) → navigate to ADD_ACCOUNT
 - extendedWaitUntil:
     visible:
       id: ACCOUNTS

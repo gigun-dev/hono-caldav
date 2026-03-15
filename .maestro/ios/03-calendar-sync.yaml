@@ -29,8 +29,10 @@ tags:
 - tapOn:
     id: list-view
 
-# Demo recurring events should exist
-- assertVisible: チームスタンドアップ
+# Demo recurring events should exist (wait for sync)
+- extendedWaitUntil:
+    visible: チームスタンドアップ
+    timeout: 30000
 - assertVisible: 1on1ミーティング
 
 - stopRecording

@@ -62,7 +62,9 @@ test:
 LOCALE ?= en
 DEVICE_UDID ?= $(shell xcrun simctl list devices available -j | jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name == "iPhone 16e") | .udid' | head -1)
 DEVICE_UDID := $(or $(DEVICE_UDID),$(shell xcrun simctl list devices available -j | jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | .udid' | head -1))
-PREFS_PLIST = $(HOME)/Library/Developer/CoreSimulator/Devices/$(DEVICE_UDID)/data/Library/Preferences/.GlobalPreferences.plist
+SIM_ROOT = $(HOME)/Library/Developer/CoreSimulator/Devices/$(DEVICE_UDID)/data
+PREFS_PLIST = $(SIM_ROOT)/Library/Preferences/.GlobalPreferences.plist
+ACCOUNTS_DB = $(SIM_ROOT)/Library/Accounts/Accounts3.sqlite
 erase-simulator:
 	@if [ -z "$(DEVICE_UDID)" ]; then echo "No available iOS simulator found"; exit 1; fi
 	xcrun simctl shutdown $(DEVICE_UDID) 2>/dev/null || true
@@ -74,6 +76,14 @@ else
 	plutil -replace AppleLanguages -json '["en"]' $(PREFS_PLIST)
 	plutil -replace AppleLocale -string en_US $(PREFS_PLIST)
 endif
+	@# Boot to create DB files, then shutdown to safely write
+	xcrun simctl bootstatus $(DEVICE_UDID) -b
+	@sleep 3
+	xcrun simctl shutdown $(DEVICE_UDID)
+	@sleep 2
+	@# Insert subscribed calendar so ACCOUNTS section appears in Settings
+	@./scripts/seed-simulator-account.sh "$(ACCOUNTS_DB)"
+	@# Final boot
 	xcrun simctl bootstatus $(DEVICE_UDID) -b
 	@echo "Simulator erased and booted: $(LOCALE) ($(DEVICE_UDID))"
 
