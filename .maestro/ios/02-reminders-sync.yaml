@@ -2,33 +2,33 @@ appId: com.apple.reminders
 tags:
   - ios
 ---
-# リマインダーアプリでデモタスクの同期を確認
-# 事前条件: 01 で CalDAV アカウント追加済み
+# Verify demo tasks sync via Reminders app
+# Prerequisite: CalDAV account added in 01
 
-- startRecording: "02-reminders-sync.mp4"
+- startRecording: "02-reminders-sync"
 
 - launchApp:
     clearState: false
 
-# ダイアログ（リセット後は毎回表示される）
+# Dialogs (shown after every reset)
 - tapOn:
-    text: 続ける
+    text: ${MAESTRO_L_CONTINUE}
     optional: true
 - tapOn:
-    text: 今はしない
+    text: ${MAESTRO_L_NOT_NOW}
     optional: true
 - tapOn:
-    text: 続ける
+    text: ${MAESTRO_L_CONTINUE}
     optional: true
 - tapOn:
-    text: 許可
+    text: ${MAESTRO_L_ALLOW}
     optional: true
 
-# デモデータの VTODO カレンダーが表示される
+# Demo VTODO calendars should be visible
 - assertVisible: 仕事
 - assertVisible: プライベート
 
-# 仕事カレンダーのタスクを確認
+# Check tasks in 仕事 calendar
 - tapOn: 仕事
 - assertVisible: 週次レポート作成
 - assertVisible: クライアントMTG準備
@@ -36,7 +36,7 @@ tags:
 - tapOn:
     id: BackButton
 
-# プライベートカレンダーのタスクを確認
+# Check tasks in プライベート calendar
 - tapOn: プライベート
 - assertVisible: スーパーで買い物
 - assertVisible: ジムに行く
@@ -45,7 +45,7 @@ tags:
 - tapOn:
     id: BackButton
 
-- tapOn: 実行済み
+- tapOn: ${MAESTRO_L_COMPLETED}
 - assertVisible: コードレビュー
 
 - stopRecording

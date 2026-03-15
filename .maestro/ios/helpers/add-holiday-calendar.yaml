@@ -1,0 +1,23 @@
+appId: com.apple.Preferences
+---
+# Add subscribed calendar (Japanese holidays)
+- tapOn:
+    id: ADD_ACCOUNT
+- extendedWaitUntil:
+    visible:
+      text: ${MAESTRO_L_CHOOSE_FROM_LIST}
+- tapOn:
+    id: "showAccountTypeList://"
+    retryTapIfNoChange: true
+- tapOn: ${MAESTRO_L_ADD_OTHER_ACCOUNT}
+- tapOn: ${MAESTRO_L_SUBSCRIBED_CALENDAR}
+- tapOn:
+    id: HOST
+- inputText: webcal://calendars.icloud.com/holidays/jp_ja.ics
+- tapOn: ${MAESTRO_L_DONE}
+- tapOn:
+    text: "OK"
+    optional: true
+- tapOn:
+    text: ${MAESTRO_L_DONE}
+    optional: true
