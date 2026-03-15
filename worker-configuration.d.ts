@@ -20,8 +20,15 @@ declare namespace Cloudflare {
 		GOOGLE_CLIENT_SECRET: string;
 		BETTER_AUTH_ALLOWED_HOSTS: "caldav.gigun-dev.workers.dev,*-caldav.gigun-dev.workers.dev" | "localhost:8787,workers-ci.097969.xyz";
 		BETTER_AUTH_PRODUCTION_URL: "https://caldav.gigun-dev.workers.dev";
-		DB?: D1Database;
+		DB: D1Database;
 		SERVER_URL?: "https://workers-ci.097969.xyz";
+		GOOGLE_REFRESH_TOKEN?: string;
+		GMAIL_USER_EMAIL?: string;
+		API_KEY?: string;
+		OPENAI_BASE_URL?: string;
+		OPENAI_API_KEY?: string;
+		GROQ_API_KEY?: string;
+		SCHEDULE_EXTRACT_MODEL?: string;
 	}
 }
 interface CloudflareBindings extends Cloudflare.Env {}

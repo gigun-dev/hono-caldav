@@ -1,4 +1,4 @@
-import type { CloudflareBindings } from '../cloudflare-bindings.js'
+
 import { createGmailServiceForUser, type GmailUserCredentials } from '../services/gmail.js'
 import { getLastHistoryIdForUser, setLastHistoryIdForUser } from '../store.js'
 import type { FeedItem } from '../types.js'

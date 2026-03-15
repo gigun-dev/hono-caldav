@@ -1,5 +1,5 @@
 import { google, gmail_v1 } from 'googleapis'
-import type { CloudflareBindings } from '../cloudflare-bindings.js'
+
 import type { EmailData, FeedItem } from '../types.js'
 import { MailThread } from '../Task/MailThread.js'
 import { mail } from '../Task/Unit.js'

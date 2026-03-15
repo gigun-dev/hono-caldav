@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { CloudflareBindings } from '../cloudflare-bindings.js'
+
 import { listRecentMessages } from '../services/gmail.js'
 import { extractSchedule } from '../services/openai.js'
 import { buildRssItem } from '../services/rss.js'

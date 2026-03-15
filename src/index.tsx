@@ -116,9 +116,9 @@ export default app;
 
 // Cron Trigger handler for demo user cleanup
 export async function scheduled(
-	_event: ScheduledEvent,
+	_event: Cloudflare.ScheduledEvent,
 	env: CloudflareBindings,
-	_ctx: ExecutionContext,
+	_ctx: Cloudflare.ExecutionContext,
 ) {
 	const result = await cleanupDemoUsers(env.DB);
 	console.log(`[Cron] Cleaned up ${result.deleted} demo users`);

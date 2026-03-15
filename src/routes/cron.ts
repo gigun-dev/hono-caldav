@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { CloudflareBindings } from '../cloudflare-bindings.js'
+
 import type { ScheduleExtractionResult } from '../types.js'
 import {
   ensureDefaultCalendarsForUser,
