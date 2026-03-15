@@ -6,7 +6,9 @@ appId: com.apple.Preferences
 - extendedWaitUntil:
     visible:
       text: ${MAESTRO_L_CHOOSE_FROM_LIST}
-- tapOn: ${MAESTRO_L_CHOOSE_FROM_LIST}
+- tapOn:
+    text: ${MAESTRO_L_CHOOSE_FROM_LIST}
+    retryTapIfNoChange: true
 - tapOn: ${MAESTRO_L_ADD_OTHER_ACCOUNT}
 - tapOn: ${MAESTRO_L_SUBSCRIBED_CALENDAR}
 - tapOn:

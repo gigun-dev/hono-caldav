@@ -12,7 +12,7 @@ env:
 
 jobs:
   maestro-ios:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
     env:
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}

@@ -58,9 +58,9 @@ test:
 	bun run test
 
 # iOS Simulator をリセット (LOCALE=ja or LOCALE=en, default: en)
-# available デバイスから iPhone 16 優先で探す (booted 不要)
+# available デバイスから iPhone 16e 優先で探す (booted 不要)
 LOCALE ?= en
-DEVICE_UDID ?= $(shell xcrun simctl list devices available -j | jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name == "iPhone 16") | .udid' | head -1)
+DEVICE_UDID ?= $(shell xcrun simctl list devices available -j | jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name == "iPhone 16e") | .udid' | head -1)
 DEVICE_UDID := $(or $(DEVICE_UDID),$(shell xcrun simctl list devices available -j | jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | .udid' | head -1))
 PREFS_PLIST = $(HOME)/Library/Developer/CoreSimulator/Devices/$(DEVICE_UDID)/data/Library/Preferences/.GlobalPreferences.plist
 erase-simulator:
