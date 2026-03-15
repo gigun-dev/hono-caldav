@@ -24,7 +24,7 @@ env:
 
 # アカウント未追加時: ADD_ACCOUNT が直接表示される → 照会カレンダーを追加して ACCOUNTS 状態にする
 - runFlow:
-    file: add-holiday-calendar.yaml
+    file: helpers/add-holiday-calendar.yaml
     when:
       notVisible:
         id: ACCOUNTS

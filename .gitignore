@@ -28,6 +28,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 .maestro/tests/
+*.mp4
 
 # misc
 .DS_Store

@@ -16,8 +16,6 @@ jobs:
     timeout-minutes: 30
     env:
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       CLOUDFLARED_TOKEN: ${{ secrets.CLOUDFLARED_TOKEN }}
 
     steps:
@@ -33,7 +31,7 @@ jobs:
       - name: Install cloudflared
         run: brew install cloudflared
 
-      - name: Boot iOS Simulator
+      - name: Boot iOS Simulator (Japanese locale)
         run: |
           DEVICE=$(xcrun simctl list devices available -j | \
             jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name == "iPhone 16") | .udid' | head -1)
@@ -41,23 +39,32 @@ jobs:
             DEVICE=$(xcrun simctl list devices available -j | \
               jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | .udid' | head -1)
           fi
-          xcrun simctl boot "$DEVICE" || true
+          xcrun simctl spawn "$DEVICE" defaults write -globalDomain AppleLanguages -array ja
+          xcrun simctl spawn "$DEVICE" defaults write -globalDomain AppleLocale -string ja_JP
+          xcrun simctl boot "$DEVICE"
 
       - name: Start servers + seed
         run: make up BG=1
 
       - name: Run Maestro iOS tests
-        run: make e2e-ios
+        run: |
+          maestro test \
+            --debug-output . \
+            .maestro/
+
+      - name: Collect recordings
+        if: always()
+        run: |
+          LATEST=$(ls -dt .maestro/tests/*/ 2>/dev/null | head -1)
+          [ -n "$LATEST" ] && mv *.mp4 "$LATEST" 2>/dev/null || true
 
       - name: Stop servers
         if: always()
         run: make stop
 
-      - name: Upload test results
+      - name: Upload Maestro report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: maestro-ios-report
-          path: |
-            test-results/
-            ~/.maestro/tests/**/*
+          path: .maestro/tests/

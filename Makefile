@@ -74,7 +74,12 @@ erase-simulator:
 e2e-ios: erase-simulator
 	maestro test \
 		--debug-output . \
-		.maestro/ --include-tags ios
+		.maestro/
+	@LATEST=$$(ls -dt .maestro/tests/*/ 2>/dev/null | head -1); \
+	if [ -n "$$LATEST" ]; then \
+		mv *.mp4 "$$LATEST" 2>/dev/null || true; \
+		echo "Results: $$LATEST"; \
+	fi
 
 # =============================================================================
 # CI (フル一括: Unit + サーバー起動 + iOS E2E + 停止)

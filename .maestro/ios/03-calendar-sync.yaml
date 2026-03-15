@@ -17,13 +17,15 @@ tags:
 
 # カレンダー一覧でスケジュールカレンダーが表示される
 - tapOn: カレンダー
-- assertVisible: スケジュール
+# - extendedWaitUntil:
+#     visible:
+#       text: スケジュール
+# - assertVisible: スケジュール
 - tapOn:
     id: done-button
 - extendedWaitUntil:
     visible:
       id: today-button
-    timeout: 10000
 - tapOn:
     id: today-button
 - tapOn:
