@@ -12,16 +12,16 @@ tags:
 
 # Dialogs (shown after every reset)
 - tapOn:
-    text: Continue
+    text: ${MAESTRO_L_CONTINUE}
     optional: true
 - tapOn:
-    text: Not Now
+    text: ${MAESTRO_L_NOT_NOW}
     optional: true
 - tapOn:
-    text: Continue
+    text: ${MAESTRO_L_CONTINUE}
     optional: true
 - tapOn:
-    text: Allow
+    text: ${MAESTRO_L_ALLOW}
     optional: true
 
 # Demo VTODO calendars should be visible
@@ -45,7 +45,7 @@ tags:
 - tapOn:
     id: BackButton
 
-- tapOn: Completed
+- tapOn: ${MAESTRO_L_COMPLETED}
 - assertVisible: コードレビュー
 
 - stopRecording

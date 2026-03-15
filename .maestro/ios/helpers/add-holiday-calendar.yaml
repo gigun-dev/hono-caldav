@@ -5,11 +5,11 @@ appId: com.apple.Preferences
     id: ADD_ACCOUNT
 - extendedWaitUntil:
     visible:
-      text: choose from a list.
-- tapOn: choose from a list.
-- tapOn: Add Other Account…
-- tapOn: Subscribed Calendar
+      text: ${MAESTRO_L_CHOOSE_FROM_LIST}
+- tapOn: ${MAESTRO_L_CHOOSE_FROM_LIST}
+- tapOn: ${MAESTRO_L_ADD_OTHER_ACCOUNT}
+- tapOn: ${MAESTRO_L_SUBSCRIBED_CALENDAR}
 - tapOn:
     id: HOST
 - inputText: webcal://calendars.icloud.com/holidays/jp_ja.ics
-- tapOn: Done
+- tapOn: ${MAESTRO_L_DONE}

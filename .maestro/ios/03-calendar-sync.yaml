@@ -12,11 +12,11 @@ tags:
 
 # Dialog (shown after every reset)
 - tapOn:
-    text: Allow
+    text: ${MAESTRO_L_ALLOW}
     optional: true
 
 # Calendar list should show schedule calendar
-- tapOn: Calendars
+- tapOn: ${MAESTRO_L_CALENDARS}
 - tapOn:
     id: done-button
 - extendedWaitUntil:

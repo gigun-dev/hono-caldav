@@ -13,12 +13,14 @@ env:
     clearState: false
 
 - scrollUntilVisible:
-    element: Apps
+    element: ${MAESTRO_L_APPS}
 - tapOn:
     id: com.apple.settings.apps
 
-- scrollUntilVisible:
-    element: Calendar
+- extendedWaitUntil:
+    visible:
+      id: com.apple.mobilecal
+    timeout: 15000
 - tapOn:
     id: com.apple.mobilecal
 
@@ -34,10 +36,10 @@ env:
     id: ACCOUNTS
 - tapOn:
     id: ADD_ACCOUNT
-- tapOn: Add Other Account…
+- tapOn: ${MAESTRO_L_ADD_OTHER_ACCOUNT}
 - scrollUntilVisible:
-    element: CalDAV Account
-- tapOn: CalDAV Account
+    element: ${MAESTRO_L_CALDAV_ACCOUNT}
+- tapOn: ${MAESTRO_L_CALDAV_ACCOUNT}
 
 - tapOn:
     id: HOST
@@ -51,10 +53,10 @@ env:
     id: PASSWORD
 - inputText: ${MAESTRO_DEMO_APP_PASSWORD}
 
-- tapOn: Next
+- tapOn: ${MAESTRO_L_NEXT}
 - extendedWaitUntil:
-    visible: Save
+    visible: ${MAESTRO_L_SAVE}
     timeout: 30000
-- tapOn: Save
+- tapOn: ${MAESTRO_L_SAVE}
 
 - stopRecording

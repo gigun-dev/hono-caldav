@@ -57,26 +57,36 @@ seed-db:
 test:
 	bun run test
 
-# iOS Simulator をリセット
+# iOS Simulator をリセット (LOCALE=ja or LOCALE=en, default: en)
+# available デバイスから iPhone 16 優先で探す (booted 不要)
+LOCALE ?= en
+DEVICE_UDID ?= $(shell xcrun simctl list devices available -j | jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name == "iPhone 16") | .udid' | head -1)
+DEVICE_UDID := $(or $(DEVICE_UDID),$(shell xcrun simctl list devices available -j | jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | .udid' | head -1))
+PREFS_PLIST = $(HOME)/Library/Developer/CoreSimulator/Devices/$(DEVICE_UDID)/data/Library/Preferences/.GlobalPreferences.plist
 erase-simulator:
-	$(eval DEVICE_UDID := $(shell xcrun simctl list devices booted -j | jq -r '.devices | to_entries[] | .value[] | select(.state == "Booted") | .udid' | head -1))
-	@if [ -z "$(DEVICE_UDID)" ]; then echo "No booted iOS simulator found"; exit 1; fi
-	xcrun simctl shutdown $(DEVICE_UDID) || true
+	@if [ -z "$(DEVICE_UDID)" ]; then echo "No available iOS simulator found"; exit 1; fi
+	xcrun simctl shutdown $(DEVICE_UDID) 2>/dev/null || true
 	xcrun simctl erase $(DEVICE_UDID)
+ifeq ($(LOCALE),ja)
+	plutil -replace AppleLanguages -json '["ja","en"]' $(PREFS_PLIST)
+	plutil -replace AppleLocale -string ja_JP $(PREFS_PLIST)
+else
+	plutil -replace AppleLanguages -json '["en"]' $(PREFS_PLIST)
+	plutil -replace AppleLocale -string en_US $(PREFS_PLIST)
+endif
 	xcrun simctl boot $(DEVICE_UDID)
-	xcrun simctl spawn $(DEVICE_UDID) defaults write -globalDomain AppleLanguages -array en
-	xcrun simctl spawn $(DEVICE_UDID) defaults write -globalDomain AppleLocale -string en_US
-	xcrun simctl shutdown $(DEVICE_UDID)
-	xcrun simctl boot $(DEVICE_UDID)
-	@echo "Simulator erased and rebooted (English)"
+	@echo "Simulator erased and booted: $(LOCALE) ($(DEVICE_UDID))"
 
 # =============================================================================
 # E2E (Maestro) — サーバー起動済み前提
 # =============================================================================
 
 # iOS E2E (Simulator リセット + テスト)
+#   make e2e-ios            → English
+#   make e2e-ios LOCALE=ja  → Japanese
 # MAESTRO_* 環境変数は .env.e2e から export 済み → Maestro が自動読み取り
 e2e-ios: erase-simulator
+	set -a && . .maestro/locale/$(LOCALE).env && set +a && \
 	maestro test \
 		--debug-output . \
 		.maestro/
