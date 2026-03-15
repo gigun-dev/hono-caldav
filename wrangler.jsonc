@@ -12,8 +12,17 @@
 		},
 	],
 	"vars": {
-		"BETTER_AUTH_ALLOWED_HOSTS": "caldav.gigun-dev.workers.dev,*-caldav.gigun-dev.workers.dev",
+		"SERVER_URL": "https://workers-ci.097969.xyz",
+		"BETTER_AUTH_ALLOWED_HOSTS": "localhost:8787,workers-ci.097969.xyz",
 		"BETTER_AUTH_PRODUCTION_URL": "https://caldav.gigun-dev.workers.dev",
+	},
+	"env": {
+		"production": {
+			"vars": {
+				"BETTER_AUTH_ALLOWED_HOSTS": "caldav.gigun-dev.workers.dev,*-caldav.gigun-dev.workers.dev",
+				"BETTER_AUTH_PRODUCTION_URL": "https://caldav.gigun-dev.workers.dev",
+			},
+		},
 	},
 	"triggers": {
 		"crons": ["0 * * * *"],

@@ -11,15 +11,9 @@ jobs:
     timeout-minutes: 30
     env:
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-      BETTER_AUTH_ALLOWED_HOSTS: "localhost:8787,workers.097969.xyz"
-      BETTER_AUTH_PRODUCTION_URL: "https://caldav.gigun-dev.workers.dev"
-      GOOGLE_CLIENT_ID: test
-      GOOGLE_CLIENT_SECRET: test
-      SERVER_URL: ${{ secrets.SERVER_URL }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       CLOUDFLARED_TOKEN: ${{ secrets.CLOUDFLARED_TOKEN }}
-      DEMO_EMAIL: ${{ secrets.DEMO_EMAIL }}
-      DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
-      DEMO_APP_PASSWORD: ${{ secrets.DEMO_APP_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -60,5 +54,5 @@ jobs:
         with:
           name: maestro-ios-report
           path: |
-            maestro-ios-report.xml
+            test-results/
             ~/.maestro/tests/**/*

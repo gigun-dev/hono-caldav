@@ -8,12 +8,19 @@ tags:
 - launchApp:
     clearState: false
 
-# 初回起動ダイアログ
-- tapOn: 続ける
-- tapOn: 今はしない
-
+# ダイアログ（リセット後は毎回表示される）
 - tapOn:
-    id: BackButton
+    text: 続ける
+    optional: true
+- tapOn:
+    text: 今はしない
+    optional: true
+- tapOn:
+    text: 続ける
+    optional: true
+- tapOn:
+    text: 許可
+    optional: true
 
 # デモデータの VTODO カレンダーが表示される
 - assertVisible: 仕事
@@ -23,12 +30,18 @@ tags:
 - tapOn: 仕事
 - assertVisible: 週次レポート作成
 - assertVisible: クライアントMTG準備
-- assertVisible: コードレビュー
 
-- back
+- tapOn:
+    id: BackButton
 
 # プライベートカレンダーのタスクを確認
 - tapOn: プライベート
 - assertVisible: スーパーで買い物
 - assertVisible: ジムに行く
 - assertVisible: 本を読む
+
+- tapOn:
+    id: BackButton
+
+- tapOn: 実行済み
+- assertVisible: コードレビュー

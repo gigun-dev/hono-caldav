@@ -71,18 +71,9 @@ function makeVevent(
 	return lines.join("\r\n");
 }
 
-async function sha256Hex(input: string): Promise<string> {
-	const data = new TextEncoder().encode(input);
-	const hash = await crypto.subtle.digest("SHA-256", data);
-	return Array.from(new Uint8Array(hash), (b) =>
-		b.toString(16).padStart(2, "0"),
-	).join("");
-}
-
 export async function seedDemoData(
 	db: D1Database,
 	userId: string,
-	opts: { appPassword?: string } = {},
 ): Promise<void> {
 	// Skip if user already has calendars (fixed mode re-visit)
 	const existing = await getCalendarsForUser(db, userId);
@@ -167,41 +158,36 @@ export async function seedDemoData(
 		"VEVENT",
 		"#45B7D1",
 	);
+	const standup = new Date(now);
+	standup.setUTCHours(10, 0, 0, 0);
+	const standupEnd = new Date(standup);
+	standupEnd.setUTCMinutes(30);
+
 	await putObject(
 		db,
 		schedule.id,
 		"demo-event-1",
 		makeVevent("demo-event-1", "チームスタンドアップ", {
-			dtstart: "20250101T100000Z",
-			dtend: "20250101T103000Z",
+			dtstart: formatDate(standup),
+			dtend: formatDate(standupEnd),
 			rrule: "FREQ=WEEKLY;BYDAY=MO,WE,FR",
 		}),
 	);
+
+	const oneOnOne = new Date(now);
+	oneOnOne.setUTCHours(14, 0, 0, 0);
+	const oneOnOneEnd = new Date(oneOnOne);
+	oneOnOneEnd.setUTCMinutes(30);
+
 	await putObject(
 		db,
 		schedule.id,
 		"demo-event-2",
 		makeVevent("demo-event-2", "1on1ミーティング", {
-			dtstart: "20250101T140000Z",
-			dtend: "20250101T143000Z",
+			dtstart: formatDate(oneOnOne),
+			dtend: formatDate(oneOnOneEnd),
 			rrule: "FREQ=WEEKLY;BYDAY=TU",
 		}),
 	);
 
-	// Seed a fixed App Password for E2E / CalDAV client testing
-	if (opts.appPassword) {
-		const passwordHash = await sha256Hex(opts.appPassword);
-		await db
-			.prepare(
-				"INSERT OR IGNORE INTO app_passwords (id, user_id, name, password_hash, prefix) VALUES (?, ?, ?, ?, ?)",
-			)
-			.bind(
-				"demo-app-pw",
-				userId,
-				"Demo App Password",
-				passwordHash,
-				opts.appPassword.slice(0, 4),
-			)
-			.run();
-	}
 }

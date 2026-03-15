@@ -12,7 +12,7 @@ import { authGuard } from "./middleware/auth-guard.js";
 import { registerCaldavRoutes } from "./caldav/handlers.js";
 import LoginPage from "./pages/login.js";
 import DashboardPage from "./pages/dashboard.js";
-import { handleDemo } from "./demo/handler.js";
+import { handleDemo, handleDemoSeed } from "./demo/handler.js";
 import { cleanupDemoUsers } from "./demo/cleanup.js";
 
 const app = new Hono<AppBindings>();
@@ -33,13 +33,13 @@ app.get("/login", (c) => {
 
 // --- Demo mode ---
 app.get("/demo", handleDemo);
+app.post("/demo/seed", caldavAuth, handleDemoSeed);
 
 // --- Dashboard (session protected) ---
 app.get("/dashboard", authGuard, async (c) => {
 	const user = c.get("user");
 	const passwords = await listAppPasswords(c.env.DB, user.id);
-	const demoEmail = c.env.DEMO_EMAIL;
-	const isDemo = user.username.endsWith("@demo.caldav.local") || (demoEmail != null && user.username === demoEmail);
+	const isDemo = user.username.endsWith("@demo.caldav.local");
 	return c.html(
 		<DashboardPage
 			userName={user.displayName ?? user.username}

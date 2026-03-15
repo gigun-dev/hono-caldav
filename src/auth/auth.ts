@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
-import { oAuthProxy } from "better-auth/plugins";
+import { anonymous } from "better-auth/plugins/anonymous";
+import { oAuthProxy } from "better-auth/plugins/oauth-proxy";
 
 export type CaldavUser = {
 	id: string;
@@ -46,6 +47,9 @@ export function createAuth(env: CloudflareBindings, headers?: Headers) {
 			oAuthProxy({
 				productionURL: env.BETTER_AUTH_PRODUCTION_URL,
 				currentURL,
+			}),
+			anonymous({
+				emailDomainName: "demo.caldav.local",
 			}),
 		],
 		session: {

@@ -1,9 +1,8 @@
 /**
- * Demo mode handler.
- * GET /demo → create/reuse demo user, seed data, redirect to dashboard.
+ * Demo mode handlers.
  *
- * Fixed mode (DEMO_EMAIL set): uses env values, reuses same user on re-visit.
- * Random mode (DEMO_EMAIL unset): creates a new random user each time.
+ * GET /demo → anonymous sign-up, seed data, redirect to dashboard.
+ * POST /demo/seed → seed data for authenticated user (Basic Auth, E2E 用).
  */
 
 import type { Context } from "hono";
@@ -11,97 +10,71 @@ import type { AppBindings } from "../types.js";
 import { createAuth } from "../auth/auth.js";
 import { seedDemoData } from "./seed.js";
 
+/**
+ * GET /demo — ワンクリックデモ体験
+ * 匿名サインアップ → seed データ作成 → ダッシュボードへリダイレクト
+ */
 export async function handleDemo(c: Context<AppBindings>): Promise<Response> {
 	const env = c.env;
-	const fixed = !!env.DEMO_EMAIL;
-
-	// Generate email/password
-	const email = fixed
-		? env.DEMO_EMAIL!
-		: `demo-${crypto.randomUUID().slice(0, 8)}@demo.caldav.local`;
-	const password = fixed
-		? (env.DEMO_PASSWORD ?? "changeme")
-		: crypto.randomUUID();
-	const name = "Demo User";
-
 	const auth = createAuth(env, c.req.raw.headers);
 
-	// 既存セッションを破棄（Gmail → Demo 切り替え時に必要）
-	const signOutRes = await auth.api.signOut({
-		headers: c.req.raw.headers,
-		returnHeaders: true,
-	}).catch(() => null);
-	const clearCookieHeaders: string[] = [];
-	if (signOutRes?.headers) {
-		for (const value of (signOutRes.headers.get("set-cookie") ?? "").split(/,(?=\s*\w+=)/)) {
-			if (value.trim()) clearCookieHeaders.push(value.trim());
-		}
-	}
-
-	// Try sign-in first (fixed mode reuse), then sign-up
-	let sessionHeaders: Headers | undefined;
-
-	// Try sign-up first, then sign-in (for fixed mode re-visit)
-	const signUp = await auth.api.signUpEmail({
-		body: { email, password, name },
-		returnHeaders: true,
-	}).catch(() => null);
-
-	if (signUp) {
-		sessionHeaders = signUp.headers;
-	} else if (fixed) {
-		// User already exists — sign in
-		const signIn = await auth.api.signInEmail({
-			body: { email, password },
+	// 既存セッションを破棄
+	await auth.api
+		.signOut({
+			headers: c.req.raw.headers,
 			returnHeaders: true,
-		}).catch((e: unknown) => {
-			console.error("[Demo] signIn failed:", e);
-			return null;
-		});
-		if (signIn) {
-			sessionHeaders = signIn.headers;
-		}
+		})
+		.catch(() => null);
+
+	// Anonymous sign-in
+	const anonResult = await auth.api.signInAnonymous({
+		returnHeaders: true,
+	});
+
+	if (!anonResult?.headers) {
+		return c.text("Failed to create anonymous user", 500);
 	}
 
-	if (!sessionHeaders) {
-		return c.text("Failed to create or sign in demo user", 500);
-	}
-
-	// Get user ID from session
-	const sessionCookie = sessionHeaders.get("set-cookie");
+	const sessionCookie = anonResult.headers.get("set-cookie");
 	if (!sessionCookie) {
 		return c.text("Failed to create demo session", 500);
 	}
 
-	// Extract session to get user ID for seeding
+	// Get session to retrieve user ID
 	const cookieHeader = sessionCookie
 		.split(",")
-		.map((c) => c.split(";")[0].trim())
+		.map((cookie) => cookie.split(";")[0].trim())
 		.join("; ");
 	const session = await auth.api.getSession({
 		headers: new Headers({ cookie: cookieHeader }),
 	});
 
-	if (session) {
-		await seedDemoData(env.DB, session.user.id, {
-			appPassword: fixed ? env.DEMO_APP_PASSWORD : undefined,
-		});
-	} else {
-		console.warn("[Demo] Could not retrieve session after sign-up");
+	if (!session) {
+		return c.text("Failed to retrieve demo session", 500);
 	}
 
-	// Redirect with session cookies (signOut のクリア + 新セッション)
+	// Seed demo calendars and tasks
+	await seedDemoData(env.DB, session.user.id);
+
+	// Redirect to dashboard with session cookies
 	const res = new Response(null, {
 		status: 302,
-		headers: {
-			Location: "/dashboard",
-		},
+		headers: { Location: "/dashboard" },
 	});
-	for (const value of clearCookieHeaders) {
-		res.headers.append("Set-Cookie", value);
-	}
 	for (const value of sessionCookie.split(/,(?=\s*\w+=)/)) {
 		res.headers.append("Set-Cookie", value.trim());
 	}
 	return res;
+}
+
+/**
+ * POST /demo/seed — E2E テスト用
+ * CalDAV Basic Auth で認証済みのユーザーに seed データを作成
+ */
+export async function handleDemoSeed(
+	c: Context<AppBindings>,
+): Promise<Response> {
+	const user = c.get("user");
+	await seedDemoData(c.env.DB, user.id);
+	return c.json({ ok: true, userId: user.id });
 }

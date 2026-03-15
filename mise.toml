@@ -1,6 +1,0 @@
-[tasks.maestro]
-description = "Run a Maestro flow with env vars"
-usage = '''
-arg "<target>" help= "target flow"
-'''
-run = "maestro test -e SERVER_URL=$SERVER_URL -e DEMO_EMAIL=$DEMO_EMAIL -e DEMO_APP_PASSWORD=$DEMO_APP_PASSWORD {{usage.target}}"
