@@ -5,10 +5,18 @@ appId: com.apple.Preferences
     id: ADD_ACCOUNT
 - extendedWaitUntil:
     visible:
-      text: ${MAESTRO_L_CHOOSE_FROM_LIST}
+      id: "showAccountTypeList://"
 - tapOn:
     id: "showAccountTypeList://"
-    retryTapIfNoChange: true
+- tapOn:
+    id: "showAccountTypeList://"
+    optional: true
+- tapOn:
+    id: "showAccountTypeList://"
+    optional: true
+- extendedWaitUntil:
+    visible: ${MAESTRO_L_ADD_OTHER_ACCOUNT}
+    timeout: 10000
 - tapOn: ${MAESTRO_L_ADD_OTHER_ACCOUNT}
 - tapOn: ${MAESTRO_L_SUBSCRIBED_CALENDAR}
 - tapOn:
