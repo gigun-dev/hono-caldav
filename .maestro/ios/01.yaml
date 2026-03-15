@@ -1,0 +1,54 @@
+appId: com.apple.Preferences
+tags:
+  - ios
+env:
+  SERVER_URL: https://workers-ci.097969.xyz
+---
+# 設定 → CalDAV アカウント追加
+# MAESTRO_DEMO_EMAIL, MAESTRO_DEMO_APP_PASSWORD は .env.e2e から自動読み取り
+
+- launchApp:
+    clearState: false
+
+- scrollUntilVisible:
+    element: アプリ
+- tapOn:
+    id: com.apple.settings.apps
+
+- scrollUntilVisible:
+    element: カレンダー
+- tapOn:
+    id: com.apple.mobilecal
+
+# アカウント未追加時: ADD_ACCOUNT が直接表示される → 照会カレンダーを追加して ACCOUNTS 状態にする
+- runFlow:
+    file: add-holiday-calendar.yaml
+    when:
+      notVisible:
+        id: ACCOUNTS
+
+# アカウント追加済み: ACCOUNTS 経由で ADD_ACCOUNT へ
+- tapOn:
+    id: ACCOUNTS
+- tapOn:
+    id: ADD_ACCOUNT
+- tapOn: その他のアカウントを追加…
+- scrollUntilVisible:
+    element: CalDAVアカウント
+- tapOn: CalDAVアカウント
+
+- tapOn:
+    id: HOST
+- inputText: ${SERVER_URL}
+
+- tapOn:
+    id: USERNAME
+- inputText: ${MAESTRO_DEMO_EMAIL}
+
+- tapOn:
+    id: PASSWORD
+- inputText: ${MAESTRO_DEMO_APP_PASSWORD}
+
+- tapOn: 次へ
+- tapOn: 保存
+- assertVisible: "カレンダーアカウント、2"

@@ -126,6 +126,28 @@ export async function updateCalendarOrder(
 	return getCalendarById(db, userId, calendarId);
 }
 
+export async function deleteCalendar(
+	db: D1Database,
+	userId: string,
+	calendarId: number,
+): Promise<boolean> {
+	const cal = await getCalendarById(db, userId, calendarId);
+	if (!cal) return false;
+	await db
+		.prepare("DELETE FROM calendarchanges WHERE calendar_id = ?")
+		.bind(calendarId)
+		.run();
+	await db
+		.prepare("DELETE FROM calendar_objects WHERE calendar_id = ?")
+		.bind(calendarId)
+		.run();
+	await db
+		.prepare("DELETE FROM calendars WHERE id = ? AND user_id = ?")
+		.bind(calendarId, userId)
+		.run();
+	return true;
+}
+
 // --- CalendarObject CRUD ---
 
 export async function getObjectsForCalendar(

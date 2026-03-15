@@ -1,0 +1,34 @@
+appId: com.apple.mobilecal
+tags:
+  - ios
+---
+# カレンダーアプリでデモイベントの同期を確認
+# 事前条件: 01 で CalDAV アカウント追加済み
+
+- launchApp:
+    clearState: false
+
+# ダイアログ（リセット後は毎回表示される）
+- tapOn:
+    text: 許可
+    optional: true
+
+# カレンダー一覧でスケジュールカレンダーが表示される
+- tapOn: カレンダー
+- assertVisible: スケジュール
+- tapOn:
+    id: done-button
+- extendedWaitUntil:
+    visible:
+      id: today-button
+    timeout: 10000
+- tapOn:
+    id: today-button
+- tapOn:
+    id: toggle-day-list-view
+- tapOn:
+    id: list-view
+
+# デモの繰り返しイベントが存在する
+- assertVisible: チームスタンドアップ
+- assertVisible: 1on1ミーティング

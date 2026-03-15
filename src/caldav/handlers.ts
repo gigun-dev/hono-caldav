@@ -1,13 +1,10 @@
 import type { Context, Hono } from "hono";
-import { decodeBase64 } from "hono/utils/encode";
 
-import {
-	type CaldavUser,
-	authenticateBasicUser,
-} from "../auth/caldav-token.js";
+import type { AppBindings } from "../types.js";
 import { isValidComponent } from "./ical.js";
 import {
 	createCalendar,
+	deleteCalendar,
 	deleteObject,
 	getCalendarById,
 	getCalendarsForUser,
@@ -30,7 +27,6 @@ import {
 	buildPrincipalResponse,
 	buildPropPatchResponse,
 	buildSyncCollectionResponse,
-	buildUnauthorizedResponse,
 	calendarCollectionProps,
 	getDepthHeader,
 	parsePropFilter,
@@ -39,7 +35,7 @@ import {
 const MAX_BODY_SIZE = 256 * 1024; // 256KB
 
 async function readBodyWithLimit(
-	c: Context<{ Bindings: CloudflareBindings }>,
+	c: Context<AppBindings>,
 ): Promise<{ body: string } | { error: Response }> {
 	const contentLength = c.req.header("content-length");
 	if (contentLength) {
@@ -148,46 +144,12 @@ function parseMkcolBody(body: string): {
 	return { displayName, componentType, color, order };
 }
 
-function parseBasicAuth(header: string | undefined): {
-	username: string;
-	password: string;
-} | null {
-	if (!header) {
-		return null;
-	}
-	const [scheme, value] = header.split(" ");
-	if (!scheme || scheme.toLowerCase() !== "basic" || !value) {
-		return null;
-	}
-	const decoded = new TextDecoder().decode(decodeBase64(value));
-	const idx = decoded.indexOf(":");
-	if (idx === -1) {
-		return null;
-	}
-	return {
-		username: decoded.slice(0, idx),
-		password: decoded.slice(idx + 1),
-	};
-}
-
 function normalizeUidParam(rawValue: string): string | null {
 	const uid = decodeURIComponent(rawValue).replace(/\.ics$/i, "");
 	return uid || null;
 }
 
-function requireAuth(
-	c: Context<{ Bindings: CloudflareBindings }>,
-): CaldavUser | null {
-	const auth = parseBasicAuth(c.req.header("authorization"));
-	if (!auth) {
-		return null;
-	}
-	return authenticateBasicUser(c.env, auth.username, auth.password);
-}
-
-export function registerCaldavRoutes(
-	app: Hono<{ Bindings: CloudflareBindings }>,
-) {
+export function registerCaldavRoutes(app: Hono<AppBindings>) {
 	app.on("OPTIONS", "/", (c) => c.body(null, 204, DAV_HEADERS));
 	app.on("OPTIONS", "/dav/*", (c) => c.body(null, 204, DAV_HEADERS));
 
@@ -197,35 +159,22 @@ export function registerCaldavRoutes(
 
 	app.get("/.well-known/caldav", (c) => c.redirect("/dav/", 301));
 
-	const handlePrincipal = async (
-		c: Context<{ Bindings: CloudflareBindings }>,
-	) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+	const handlePrincipal = async (c: Context<AppBindings>) => {
+		const user = c.get("user");
 		const read = await readBodyWithLimit(c);
 		const filter = parsePropFilter("error" in read ? "" : read.body);
 		return buildPrincipalResponse(c, user, filter);
 	};
 
-	const handleEntry = async (c: Context<{ Bindings: CloudflareBindings }>) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+	const handleEntry = async (c: Context<AppBindings>) => {
+		const user = c.get("user");
 		const read = await readBodyWithLimit(c);
 		const filter = parsePropFilter("error" in read ? "" : read.body);
 		return buildEntryResponse(c, user, filter);
 	};
 
-	const handleProjects = async (
-		c: Context<{ Bindings: CloudflareBindings }>,
-	) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+	const handleProjects = async (c: Context<AppBindings>) => {
+		const user = c.get("user");
 		const depth = getDepthHeader(c.req.header("depth"));
 		const read = await readBodyWithLimit(c);
 		const filter = parsePropFilter("error" in read ? "" : read.body);
@@ -233,13 +182,8 @@ export function registerCaldavRoutes(
 		return buildCalendarCollectionResponse(c, user, calendars, depth, filter);
 	};
 
-	const handleProject = async (
-		c: Context<{ Bindings: CloudflareBindings }>,
-	) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+	const handleProject = async (c: Context<AppBindings>) => {
+		const user = c.get("user");
 		const depth = getDepthHeader(c.req.header("depth"));
 		const read = await readBodyWithLimit(c);
 		const filter = parsePropFilter("error" in read ? "" : read.body);
@@ -258,11 +202,8 @@ export function registerCaldavRoutes(
 		return buildCalendarResponse(c, cal, filter);
 	};
 
-	const handleReport = async (c: Context<{ Bindings: CloudflareBindings }>) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+	const handleReport = async (c: Context<AppBindings>) => {
+		const user = c.get("user");
 		const read = await readBodyWithLimit(c);
 		if ("error" in read) {
 			return read.error;
@@ -370,13 +311,8 @@ export function registerCaldavRoutes(
 		return buildCalendarQueryResponse(c, cal, objects, true, currentSyncToken);
 	};
 
-	const handleProjectPropPatch = async (
-		c: Context<{ Bindings: CloudflareBindings }>,
-	) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+	const handleProjectPropPatch = async (c: Context<AppBindings>) => {
+		const user = c.get("user");
 		const read = await readBodyWithLimit(c);
 		if ("error" in read) {
 			return read.error;
@@ -427,7 +363,7 @@ export function registerCaldavRoutes(
 
 	// Shared calendar creation logic for MKCOL and MKCALENDAR
 	const handleCreateCalendar = async (
-		c: Context<{ Bindings: CloudflareBindings }>,
+		c: Context<AppBindings>,
 		parseBody: (body: string) => {
 			displayName: string | null;
 			componentType: string | null;
@@ -435,10 +371,7 @@ export function registerCaldavRoutes(
 			order: number | null;
 		},
 	) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+		const user = c.get("user");
 		const read = await readBodyWithLimit(c);
 		if ("error" in read) {
 			return read.error;
@@ -461,12 +394,13 @@ export function registerCaldavRoutes(
 		});
 	};
 
-	const handleMkcol = (c: Context<{ Bindings: CloudflareBindings }>) =>
+	const handleMkcol = (c: Context<AppBindings>) =>
 		handleCreateCalendar(c, parseMkcolBody);
 
-	const handleMkcalendar = (c: Context<{ Bindings: CloudflareBindings }>) =>
+	const handleMkcalendar = (c: Context<AppBindings>) =>
 		handleCreateCalendar(c, parseMkcalendarBody);
 
+	// PROPFIND / needs auth but is outside /dav/* middleware scope
 	app.on("PROPFIND", "/", handleEntry);
 
 	app.on("PROPFIND", "/.well-known/caldav", (c) => c.redirect("/dav/", 301));
@@ -495,9 +429,7 @@ export function registerCaldavRoutes(
 
 	// MKCALENDAR: workerd は非標準メソッドを受け付けないため、
 	// proxy が POST + X-Caldav-Method: MKCALENDAR に書き換えて送ってくる
-	const handleMkcalendarProxy = (
-		c: Context<{ Bindings: CloudflareBindings }>,
-	) => {
+	const handleMkcalendarProxy = (c: Context<AppBindings>) => {
 		if (c.req.header("x-caldav-method")?.toUpperCase() !== "MKCALENDAR") {
 			return c.text("Method Not Allowed", 405);
 		}
@@ -509,10 +441,7 @@ export function registerCaldavRoutes(
 
 	// GET single object
 	app.get("/dav/projects/:projectId/:uid", async (c) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+		const user = c.get("user");
 		const cal = await getCalendarById(
 			c.env.DB,
 			user.id,
@@ -537,10 +466,7 @@ export function registerCaldavRoutes(
 
 	// PROPFIND single object
 	app.on("PROPFIND", "/dav/projects/:projectId/:uid", async (c) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+		const user = c.get("user");
 		const read = await readBodyWithLimit(c);
 		const filter = parsePropFilter("error" in read ? "" : read.body);
 		const cal = await getCalendarById(
@@ -564,10 +490,7 @@ export function registerCaldavRoutes(
 
 	// PUT (create or update) object
 	app.put("/dav/projects/:projectId/:uid", async (c) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+		const user = c.get("user");
 		const read = await readBodyWithLimit(c);
 		if ("error" in read) {
 			return read.error;
@@ -613,12 +536,20 @@ export function registerCaldavRoutes(
 		});
 	});
 
+	// DELETE calendar collection
+	app.delete("/dav/projects/:projectId", async (c) => {
+		const user = c.get("user");
+		const calendarId = Number(c.req.param("projectId"));
+		const deleted = await deleteCalendar(c.env.DB, user.id, calendarId);
+		if (!deleted) {
+			return c.text("Calendar not found", 404);
+		}
+		return c.body(null, 204);
+	});
+
 	// DELETE object
 	app.delete("/dav/projects/:projectId/:uid", async (c) => {
-		const user = requireAuth(c);
-		if (!user) {
-			return buildUnauthorizedResponse(c);
-		}
+		const user = c.get("user");
 		const cal = await getCalendarById(
 			c.env.DB,
 			user.id,

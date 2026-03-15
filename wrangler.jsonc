@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "caldav",
-	"main": "src/index.ts",
+	"main": "src/index.tsx",
 	"compatibility_date": "2026-01-26",
 	"compatibility_flags": ["nodejs_compat"],
 	"d1_databases": [
@@ -11,6 +11,22 @@
 			"database_id": "256b87d7-86a1-400b-a19d-004796e611d2",
 		},
 	],
+	"vars": {
+		"SERVER_URL": "https://workers-ci.097969.xyz",
+		"BETTER_AUTH_ALLOWED_HOSTS": "localhost:8787,workers-ci.097969.xyz",
+		"BETTER_AUTH_PRODUCTION_URL": "https://caldav.gigun-dev.workers.dev",
+	},
+	"env": {
+		"production": {
+			"vars": {
+				"BETTER_AUTH_ALLOWED_HOSTS": "caldav.gigun-dev.workers.dev,*-caldav.gigun-dev.workers.dev",
+				"BETTER_AUTH_PRODUCTION_URL": "https://caldav.gigun-dev.workers.dev",
+			},
+		},
+	},
+	"triggers": {
+		"crons": ["0 * * * *"],
+	},
 	"observability": {
 		"enabled": true,
 		"head_sampling_rate": 1,
