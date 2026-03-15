@@ -7,7 +7,7 @@ appId: com.apple.Preferences
     visible:
       text: ${MAESTRO_L_CHOOSE_FROM_LIST}
 - tapOn:
-    text: ${MAESTRO_L_CHOOSE_FROM_LIST}
+    id: "showAccountTypeList://"
     retryTapIfNoChange: true
 - tapOn: ${MAESTRO_L_ADD_OTHER_ACCOUNT}
 - tapOn: ${MAESTRO_L_SUBSCRIBED_CALENDAR}
