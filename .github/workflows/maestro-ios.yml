@@ -31,7 +31,7 @@ jobs:
       - name: Install cloudflared
         run: brew install cloudflared
 
-      - name: Boot iOS Simulator (Japanese locale)
+      - name: Boot iOS Simulator
         run: |
           DEVICE=$(xcrun simctl list devices available -j | \
             jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name == "iPhone 16") | .udid' | head -1)
@@ -40,15 +40,9 @@ jobs:
               jq -r '.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | .udid' | head -1)
           fi
           xcrun simctl bootstatus "$DEVICE" -b
-          xcrun simctl spawn "$DEVICE" defaults write -globalDomain AppleLanguages -array ja
-          xcrun simctl spawn "$DEVICE" defaults write -globalDomain AppleLocale -string ja_JP
-          xcrun simctl shutdown "$DEVICE"
-          xcrun simctl bootstatus "$DEVICE" -b
-          echo "Language: $(xcrun simctl spawn "$DEVICE" defaults read -globalDomain AppleLanguages)"
-          echo "Locale: $(xcrun simctl spawn "$DEVICE" defaults read -globalDomain AppleLocale)"
 
       - name: Start servers + seed
-        run: make up BG=1
+        run: make up
 
       - name: Run Maestro iOS tests
         run: |

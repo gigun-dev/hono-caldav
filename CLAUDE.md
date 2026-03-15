@@ -14,10 +14,12 @@ Google 連携で Gmail タスク抽出や自然言語 CRUD を提供する。
 - `bun run dev` — ローカル開発サーバー
 - `bun run deploy` — Cloudflare Workers にデプロイ
 - `bun run cf-typegen` — CloudflareBindings 型を再生成
-- `make up` — DB リセット + サーバー起動 (wrangler + proxy + tunnel) + seed (Ctrl+C で全停止)
+- `make dev` — DB リセット + サーバー起動 + seed、Ctrl+C で全停止（ローカル開発用）
+- `make up` — 同上、即 return（CI・スクリプト向け）
+- `make stop` — 全サービス停止
 - `make test` — Vitest 実行
 - `make e2e-ios` — Maestro iOS E2E (Simulator リセット込み、サーバー起動済み前提)
-- `make ci` — フル: test → up BG=1 → e2e-ios → stop
+- `make ci` — フル: test → up → e2e-ios → stop
 
 ## アーキテクチャ
 

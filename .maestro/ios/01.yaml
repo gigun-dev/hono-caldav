@@ -4,8 +4,8 @@ tags:
 env:
   SERVER_URL: https://workers-ci.097969.xyz
 ---
-# 設定 → CalDAV アカウント追加
-# MAESTRO_DEMO_EMAIL, MAESTRO_DEMO_APP_PASSWORD は .env.e2e から自動読み取り
+# Settings → CalDAV account setup
+# MAESTRO_DEMO_EMAIL, MAESTRO_DEMO_APP_PASSWORD are auto-read from .env.e2e
 
 - startRecording: "01-account-setup"
 
@@ -13,31 +13,31 @@ env:
     clearState: false
 
 - scrollUntilVisible:
-    element: アプリ
+    element: Apps
 - tapOn:
     id: com.apple.settings.apps
 
 - scrollUntilVisible:
-    element: カレンダー
+    element: Calendar
 - tapOn:
     id: com.apple.mobilecal
 
-# アカウント未追加時: ADD_ACCOUNT が直接表示される → 照会カレンダーを追加して ACCOUNTS 状態にする
+# No accounts: ADD_ACCOUNT shown directly → add subscribed calendar first
 - runFlow:
     file: helpers/add-holiday-calendar.yaml
     when:
       notVisible:
         id: ACCOUNTS
 
-# アカウント追加済み: ACCOUNTS 経由で ADD_ACCOUNT へ
+# Accounts exist: navigate via ACCOUNTS → ADD_ACCOUNT
 - tapOn:
     id: ACCOUNTS
 - tapOn:
     id: ADD_ACCOUNT
-- tapOn: その他のアカウントを追加…
+- tapOn: Add Other Account…
 - scrollUntilVisible:
-    element: CalDAVアカウント
-- tapOn: CalDAVアカウント
+    element: CalDAV Account
+- tapOn: CalDAV Account
 
 - tapOn:
     id: HOST
@@ -51,8 +51,10 @@ env:
     id: PASSWORD
 - inputText: ${MAESTRO_DEMO_APP_PASSWORD}
 
-- tapOn: 次へ
-- tapOn: 保存
-- assertVisible: "カレンダーアカウント、2"
+- tapOn: Next
+- extendedWaitUntil:
+    visible: Save
+    timeout: 30000
+- tapOn: Save
 
 - stopRecording

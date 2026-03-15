@@ -1,4 +1,4 @@
-.PHONY: test up stop reset-db seed-db erase-simulator e2e-ios ci
+.PHONY: test up dev stop reset-db seed-db erase-simulator e2e-ios ci
 
 -include .env
 -include .env.e2e
@@ -8,31 +8,26 @@ export
 # Server Management
 # =============================================================================
 
-# サーバー起動 (BG=1 で CI 用バックグラウンドモード)
-#   make up     → ログ表示、Ctrl+C で全停止
-#   make up BG=1 → 全バックグラウンド (CI 用)
-#
-# wrangler を1回だけ起動し、起動中に migrate → seed → そのまま稼働
+# サーバー起動 (DB リセット + migrate + seed → バックグラウンド稼働)
+#   make up   → 起動、ログはターミナルに流れる
+#   make stop → 全停止
 up:
 	@$(MAKE) stop 2>/dev/null || true
 	@rm -rf .wrangler/state/v3/d1
 	@cloudflared tunnel run --token $(CLOUDFLARED_TOKEN) > /dev/null 2>&1 &
-	@bun run dev:proxy > /dev/null 2>&1 &
-	@bun run dev > /dev/null 2>&1 &
+	@bun run dev:proxy &
+	@bun run dev &
 	@for i in $$(seq 1 30); do curl -s http://localhost:8787/ > /dev/null 2>&1 && break; sleep 1; done
 	@yes | bun run db:migrate:local > /dev/null 2>&1
 	@D1=$$(find .wrangler/state/v3/d1 -name '*.sqlite' 2>/dev/null | head -1); \
 	./scripts/seed-e2e.sh "$$D1"
 	@curl -s -X POST -u "$(MAESTRO_DEMO_EMAIL):$(MAESTRO_DEMO_APP_PASSWORD)" http://localhost:8787/demo/seed > /dev/null
-	@if [ "$(BG)" = "1" ]; then \
-		echo "Server ready (background)"; \
-	else \
-		$(MAKE) stop; \
-		bun run dev:proxy & \
-		trap 'pkill -f "wrangler dev" 2>/dev/null; pkill -f "bun run proxy" 2>/dev/null; pkill -f "cloudflared tunnel" 2>/dev/null; echo "\nAll services stopped"; exit 0' INT TERM; \
-		echo "Starting wrangler dev... (Ctrl+C to stop all)"; \
-		bun run dev; \
-	fi
+	@echo "Server ready (make stop to shutdown)"
+
+# ローカル開発 (make up + Ctrl+C で全停止)
+dev: up
+	@trap '$(MAKE) stop; exit 0' INT TERM; \
+	while true; do sleep 86400; done
 
 # サーバー停止
 stop:
@@ -69,7 +64,11 @@ erase-simulator:
 	xcrun simctl shutdown $(DEVICE_UDID) || true
 	xcrun simctl erase $(DEVICE_UDID)
 	xcrun simctl boot $(DEVICE_UDID)
-	@echo "Simulator erased and rebooted"
+	xcrun simctl spawn $(DEVICE_UDID) defaults write -globalDomain AppleLanguages -array en
+	xcrun simctl spawn $(DEVICE_UDID) defaults write -globalDomain AppleLocale -string en_US
+	xcrun simctl shutdown $(DEVICE_UDID)
+	xcrun simctl boot $(DEVICE_UDID)
+	@echo "Simulator erased and rebooted (English)"
 
 # =============================================================================
 # E2E (Maestro) — サーバー起動済み前提
@@ -92,6 +91,6 @@ e2e-ios: erase-simulator
 # =============================================================================
 
 ci: test
-	$(MAKE) up BG=1
+	$(MAKE) up
 	$(MAKE) e2e-ios
 	$(MAKE) stop

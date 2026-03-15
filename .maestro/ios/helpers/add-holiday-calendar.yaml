@@ -1,12 +1,15 @@
 appId: com.apple.Preferences
 ---
-# 照会カレンダー (日本の祝日) を追加
+# Add subscribed calendar (Japanese holidays)
 - tapOn:
     id: ADD_ACCOUNT
-- tapOn: リストから選択します。
-- tapOn: その他のアカウントを追加…
-- tapOn: 照会カレンダー
+- extendedWaitUntil:
+    visible:
+      text: choose from a list.
+- tapOn: choose from a list.
+- tapOn: Add Other Account…
+- tapOn: Subscribed Calendar
 - tapOn:
     id: HOST
 - inputText: webcal://calendars.icloud.com/holidays/jp_ja.ics
-- tapOn: 終了
+- tapOn: Done
