@@ -15,3 +15,9 @@ appId: com.apple.Preferences
     id: HOST
 - inputText: webcal://calendars.icloud.com/holidays/jp_ja.ics
 - tapOn: ${MAESTRO_L_DONE}
+- tapOn:
+    text: "OK"
+    optional: true
+- tapOn:
+    text: ${MAESTRO_L_DONE}
+    optional: true
