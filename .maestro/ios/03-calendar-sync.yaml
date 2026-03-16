@@ -15,10 +15,15 @@ tags:
     text: ${MAESTRO_L_ALLOW}
     optional: true
 
-# Calendar list should show schedule calendar
+# Open calendar list and verify CalDAV calendar exists
 - tapOn: ${MAESTRO_L_CALENDARS}
+- extendedWaitUntil:
+    visible: スケジュール
+    timeout: 60000
 - tapOn:
     id: done-button
+
+# Switch to list view and check events
 - extendedWaitUntil:
     visible:
       id: today-button
@@ -29,7 +34,7 @@ tags:
 - tapOn:
     id: list-view
 
-# Demo recurring events should exist (wait for sync)
+# Demo recurring events should exist
 - extendedWaitUntil:
     visible: チームスタンドアップ
     timeout: 60000
