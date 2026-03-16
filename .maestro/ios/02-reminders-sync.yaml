@@ -42,6 +42,9 @@ tags:
 
 - tapOn:
     id: BackButton
+- extendedWaitUntil:
+    visible: プライベート
+    timeout: 10000
 
 # Check tasks in プライベート calendar
 - tapOn: プライベート
@@ -51,6 +54,9 @@ tags:
 
 - tapOn:
     id: BackButton
+- extendedWaitUntil:
+    visible: ${MAESTRO_L_COMPLETED}
+    timeout: 10000
 
 - tapOn: ${MAESTRO_L_COMPLETED}
 - assertVisible: コードレビュー
