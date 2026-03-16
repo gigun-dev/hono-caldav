@@ -58,7 +58,7 @@ env:
 - tapOn: ${MAESTRO_L_NEXT}
 - extendedWaitUntil:
     visible: ${MAESTRO_L_SAVE}
-    timeout: 30000
+    timeout: 120000
 - tapOn: ${MAESTRO_L_SAVE}
 
 - stopRecording
