@@ -24,11 +24,6 @@ tags:
     text: ${MAESTRO_L_ALLOW}
     optional: true
 
-# iCloud Syncing dialog may appear after initial dialogs
-- tapOn:
-    text: ${MAESTRO_L_NOT_NOW}
-    optional: true
-
 # Demo VTODO calendars should be visible (wait for sync)
 - extendedWaitUntil:
     visible: 仕事
