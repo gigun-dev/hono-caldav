@@ -7,6 +7,8 @@ tags:
 
 - startRecording: "02-reminders-sync"
 
+# Kill and relaunch to trigger CalDAV sync
+- stopApp
 - launchApp:
     clearState: false
 
@@ -27,7 +29,7 @@ tags:
 # Demo VTODO calendars should be visible (wait for sync)
 - extendedWaitUntil:
     visible: 仕事
-    timeout: 120000
+    timeout: 240000
 - assertVisible: プライベート
 
 # Check tasks in 仕事 calendar
