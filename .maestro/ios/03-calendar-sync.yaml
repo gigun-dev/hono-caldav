@@ -7,6 +7,8 @@ tags:
 
 - startRecording: "03-calendar-sync"
 
+# Kill and relaunch to trigger fresh CalDAV sync
+- stopApp
 - launchApp:
     clearState: false
 
@@ -37,7 +39,7 @@ tags:
 # Demo recurring events should exist
 - extendedWaitUntil:
     visible: チームスタンドアップ
-    timeout: 60000
+    timeout: 120000
 - assertVisible: 1on1ミーティング
 
 - stopRecording

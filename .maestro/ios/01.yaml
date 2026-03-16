@@ -50,6 +50,8 @@ env:
 - inputText: ${MAESTRO_DEMO_EMAIL}
 
 - tapOn:
+    id: DESCRIPTION
+- tapOn:
     id: PASSWORD
 - inputText: ${MAESTRO_DEMO_APP_PASSWORD}
 
