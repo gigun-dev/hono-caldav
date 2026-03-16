@@ -15,7 +15,8 @@ env:
     clearState: false
 
 - scrollUntilVisible:
-    element: ${MAESTRO_L_APPS}
+    element:
+      id: com.apple.settings.apps
     timeout: 30000
 - tapOn:
     id: com.apple.settings.apps
