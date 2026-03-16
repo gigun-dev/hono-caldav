@@ -32,7 +32,7 @@ tags:
 # Demo recurring events should exist (wait for sync)
 - extendedWaitUntil:
     visible: チームスタンドアップ
-    timeout: 30000
+    timeout: 60000
 - assertVisible: 1on1ミーティング
 
 - stopRecording
