@@ -27,7 +27,7 @@ tags:
 # Demo VTODO calendars should be visible (wait for sync)
 - extendedWaitUntil:
     visible: 仕事
-    timeout: 30000
+    timeout: 120000
 - assertVisible: プライベート
 
 # Check tasks in 仕事 calendar

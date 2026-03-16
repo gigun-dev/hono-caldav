@@ -59,6 +59,8 @@ env:
 - extendedWaitUntil:
     visible: ${MAESTRO_L_SAVE}
     timeout: 120000
-- tapOn: ${MAESTRO_L_SAVE}
+- tapOn:
+    text: ${MAESTRO_L_SAVE}
+    retryTapIfNoChange: true
 
 - stopRecording
