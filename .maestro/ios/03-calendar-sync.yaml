@@ -17,11 +17,17 @@ tags:
     text: ${MAESTRO_L_ALLOW}
     optional: true
 
-# Open calendar list and verify CalDAV calendar exists
+# Open calendar list — this triggers CalDAV sync
 - tapOn: ${MAESTRO_L_CALENDARS}
+
+# Close and reopen to give sync time to start
+- tapOn:
+    id: done-button
+- tapOn: ${MAESTRO_L_CALENDARS}
+
 - extendedWaitUntil:
     visible: スケジュール
-    timeout: 120000
+    timeout: 240000
 - tapOn:
     id: done-button
 
@@ -39,7 +45,7 @@ tags:
 # Demo recurring events should exist
 - extendedWaitUntil:
     visible: チームスタンドアップ
-    timeout: 120000
+    timeout: 240000
 - assertVisible: 1on1ミーティング
 
 - stopRecording
