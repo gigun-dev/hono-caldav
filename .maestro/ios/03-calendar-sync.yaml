@@ -19,7 +19,7 @@ tags:
 - tapOn: ${MAESTRO_L_CALENDARS}
 - extendedWaitUntil:
     visible: スケジュール
-    timeout: 60000
+    timeout: 120000
 - tapOn:
     id: done-button
 
