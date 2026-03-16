@@ -17,14 +17,8 @@ tags:
     text: ${MAESTRO_L_ALLOW}
     optional: true
 
-# Open calendar list — this triggers CalDAV sync
+# Open calendar list and verify CalDAV calendar exists
 - tapOn: ${MAESTRO_L_CALENDARS}
-
-# Close and reopen to give sync time to start
-- tapOn:
-    id: done-button
-- tapOn: ${MAESTRO_L_CALENDARS}
-
 - extendedWaitUntil:
     visible: スケジュール
     timeout: 240000
