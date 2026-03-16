@@ -76,11 +76,14 @@ else
 	plutil -replace AppleLanguages -json '["en"]' $(PREFS_PLIST)
 	plutil -replace AppleLocale -string en_US $(PREFS_PLIST)
 endif
+	@# Boot to create DB files, then shutdown to safely INSERT
 	xcrun simctl bootstatus $(DEVICE_UDID) -b
-	@sleep 5
+	xcrun simctl shutdown $(DEVICE_UDID)
+	@sleep 2
 	@# Insert subscribed calendar so ACCOUNTS section appears in Settings
-	@# accountsd picks up changes after a short delay (no reboot needed)
 	@./scripts/seed-simulator-account.sh "$(ACCOUNTS_DB)"
+	@# Final boot with account data
+	xcrun simctl bootstatus $(DEVICE_UDID) -b
 	@echo "Simulator erased and booted: $(LOCALE) ($(DEVICE_UDID))"
 
 # =============================================================================
