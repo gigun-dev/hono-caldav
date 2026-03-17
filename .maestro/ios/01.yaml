@@ -2,42 +2,45 @@ appId: com.apple.Preferences
 tags:
   - ios
 env:
-  SERVER_URL: https://workers-ci.097969.xyz
+  SERVER_URL: ${MAESTRO_SERVER_URL}
 ---
-# 設定 → CalDAV アカウント追加
-# MAESTRO_DEMO_EMAIL, MAESTRO_DEMO_APP_PASSWORD は .env.e2e から自動読み取り
+# Settings → CalDAV account setup
+# Prerequisite: erase-simulator has seeded a subscribed calendar via DB INSERT
+#   so that "Calendar Accounts" (ACCOUNTS) section is visible.
+# MAESTRO_DEMO_EMAIL, MAESTRO_DEMO_APP_PASSWORD are auto-read from .env.e2e
 
-- startRecording: "01-account-setup.mp4"
+- startRecording: "01-account-setup"
 
 - launchApp:
     clearState: false
 
 - scrollUntilVisible:
-    element: アプリ
+    element:
+      id: com.apple.settings.apps
+    timeout: 30000
 - tapOn:
     id: com.apple.settings.apps
 
-- scrollUntilVisible:
-    element: カレンダー
+- extendedWaitUntil:
+    visible:
+      id: com.apple.mobilecal
+    timeout: 15000
 - tapOn:
     id: com.apple.mobilecal
 
-# アカウント未追加時: ADD_ACCOUNT が直接表示される → 照会カレンダーを追加して ACCOUNTS 状態にする
-- runFlow:
-    file: add-holiday-calendar.yaml
-    when:
-      notVisible:
-        id: ACCOUNTS
-
-# アカウント追加済み: ACCOUNTS 経由で ADD_ACCOUNT へ
+# ACCOUNTS exists (seeded by erase-simulator) → navigate to ADD_ACCOUNT
+- extendedWaitUntil:
+    visible:
+      id: ACCOUNTS
+    timeout: 15000
 - tapOn:
     id: ACCOUNTS
 - tapOn:
     id: ADD_ACCOUNT
-- tapOn: その他のアカウントを追加…
+- tapOn: ${MAESTRO_L_ADD_OTHER_ACCOUNT}
 - scrollUntilVisible:
-    element: CalDAVアカウント
-- tapOn: CalDAVアカウント
+    element: ${MAESTRO_L_CALDAV_ACCOUNT}
+- tapOn: ${MAESTRO_L_CALDAV_ACCOUNT}
 
 - tapOn:
     id: HOST
@@ -47,12 +50,20 @@ env:
     id: USERNAME
 - inputText: ${MAESTRO_DEMO_EMAIL}
 
+# Tap DESCRIPTION first to reset keyboard focus, then tap PASSWORD.
+# On CI after erase, direct PASSWORD tap may hit label instead of input field.
+- tapOn:
+    id: DESCRIPTION
 - tapOn:
     id: PASSWORD
 - inputText: ${MAESTRO_DEMO_APP_PASSWORD}
 
-- tapOn: 次へ
-- tapOn: 保存
-- assertVisible: "カレンダーアカウント、2"
+- tapOn: ${MAESTRO_L_NEXT}
+- extendedWaitUntil:
+    visible: ${MAESTRO_L_SAVE}
+    timeout: 240000
+- tapOn:
+    text: ${MAESTRO_L_SAVE}
+    retryTapIfNoChange: true
 
 - stopRecording
