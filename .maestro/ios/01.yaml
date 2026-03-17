@@ -2,7 +2,7 @@ appId: com.apple.Preferences
 tags:
   - ios
 env:
-  SERVER_URL: https://workers-ci.097969.xyz
+  SERVER_URL: ${MAESTRO_SERVER_URL}
 ---
 # Settings → CalDAV account setup
 # Prerequisite: erase-simulator has seeded a subscribed calendar via DB INSERT

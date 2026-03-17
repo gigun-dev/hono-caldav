@@ -16,7 +16,6 @@ jobs:
     timeout-minutes: 45
     env:
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-      CLOUDFLARED_TOKEN: ${{ secrets.CLOUDFLARED_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -28,15 +27,15 @@ jobs:
           curl -Ls https://get.maestro.mobile.dev | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-      - name: Install cloudflared
-        run: brew install cloudflared
-
       - name: Start servers + seed
         run: make up
+        env:
+          SKIP_CLOUDFLARED: 1
 
       - name: Run Maestro iOS tests
         env:
           MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
+          MAESTRO_SERVER_URL: http://localhost:8787
         run: make e2e-ios
 
       - name: Stop servers

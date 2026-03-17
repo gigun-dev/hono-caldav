@@ -14,7 +14,9 @@ export
 up:
 	@$(MAKE) stop 2>/dev/null || true
 	@rm -rf .wrangler/state/v3/d1
+ifndef SKIP_CLOUDFLARED
 	@cloudflared tunnel run --token $(CLOUDFLARED_TOKEN) > /dev/null 2>&1 &
+endif
 	@bun run dev:proxy &
 	@bun run dev &
 	@for i in $$(seq 1 30); do curl -s http://localhost:8787/ > /dev/null 2>&1 && break; sleep 1; done
