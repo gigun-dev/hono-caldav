@@ -50,10 +50,10 @@ env:
     id: USERNAME
 - inputText: ${MAESTRO_DEMO_EMAIL}
 
-# Tap DESCRIPTION first to reset keyboard focus, then tap PASSWORD.
-# On CI after erase, direct PASSWORD tap may hit label instead of input field.
-- tapOn:
-    id: DESCRIPTION
+# Tap title bar to dismiss keyboard before PASSWORD.
+# After USERNAME inputText, keyboard is still active and PASSWORD tap
+# hits the label instead of the input field on fresh-erased simulators.
+- tapOn: "CalDAV"
 - tapOn:
     id: PASSWORD
 - inputText: ${MAESTRO_DEMO_APP_PASSWORD}
