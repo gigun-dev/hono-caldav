@@ -17,8 +17,12 @@ import { cleanupDemoUsers } from "./demo/cleanup.js";
 
 const app = new Hono<AppBindings>();
 
-// --- Health check ---
-app.get("/", (c) => c.text("CalDAV VTODO server is running."));
+// --- Root: redirect based on session ---
+app.get("/", async (c) => {
+	const auth = createAuth(c.env, c.req.raw.headers);
+	const session = await auth.api.getSession({ headers: c.req.raw.headers });
+	return c.redirect(session ? "/dashboard" : "/login");
+});
 
 // --- better-auth handler ---
 app.on(["POST", "GET"], "/api/auth/*", (c) => {

@@ -2,28 +2,33 @@ appId: com.apple.mobilecal
 tags:
   - ios
 ---
-# カレンダーアプリでデモイベントの同期を確認
-# 事前条件: 01 で CalDAV アカウント追加済み
+# Verify demo events sync via Calendar app
+# Prerequisite: CalDAV account added in 01
 
-- startRecording: "03-calendar-sync.mp4"
+- startRecording: "03-calendar-sync"
 
+# Kill and relaunch to trigger fresh CalDAV sync
+- stopApp
 - launchApp:
     clearState: false
 
-# ダイアログ（リセット後は毎回表示される）
+# Dialog (shown after every reset)
 - tapOn:
-    text: 許可
+    text: ${MAESTRO_L_ALLOW}
     optional: true
 
-# カレンダー一覧でスケジュールカレンダーが表示される
-- tapOn: カレンダー
-- assertVisible: スケジュール
+# Open calendar list and verify CalDAV calendar exists
+- tapOn: ${MAESTRO_L_CALENDARS}
+- extendedWaitUntil:
+    visible: スケジュール
+    timeout: 240000
 - tapOn:
     id: done-button
+
+# Switch to list view and check events
 - extendedWaitUntil:
     visible:
       id: today-button
-    timeout: 10000
 - tapOn:
     id: today-button
 - tapOn:
@@ -31,8 +36,10 @@ tags:
 - tapOn:
     id: list-view
 
-# デモの繰り返しイベントが存在する
-- assertVisible: チームスタンドアップ
+# Demo recurring events should exist
+- extendedWaitUntil:
+    visible: チームスタンドアップ
+    timeout: 240000
 - assertVisible: 1on1ミーティング
 
 - stopRecording

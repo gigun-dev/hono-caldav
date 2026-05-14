@@ -7,6 +7,12 @@
 		"maestro": {
 			"command": "maestro",
 			"args": ["mcp"]
+		},
+		"proxyman": {
+			"type": "stdio",
+			"command": "/Applications/Proxyman.app/Contents/MacOS/mcp-server",
+			"args": [],
+			"env": {}
 		}
 	}
 }
