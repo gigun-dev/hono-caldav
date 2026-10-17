@@ -1,5 +1,9 @@
 # hono-caldav
 
+> [!IMPORTANT]
+> このリポジトリはアーカイブ済みで、更新していません。開発は後継の
+> [gigun-dev/caldav](https://github.com/gigun-dev/caldav) で続けています。
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gigun-dev/hono-caldav)
 
 Cloudflare Workers 上で動く CalDAV サーバー。
