@@ -109,6 +109,10 @@ app.use("/dav/*", caldavAuth);
 // PROPFIND / also needs CalDAV auth (iOS hits this on initial connect)
 app.on("PROPFIND", "/", caldavAuth);
 
+// iOS sometimes PROPFINDs /principals/ without the /dav/ prefix.
+// Apply caldavAuth so the handler can read c.get("user").
+app.use("/principals/*", caldavAuth);
+
 // --- CalDAV routes ---
 registerCaldavRoutes(app);
 

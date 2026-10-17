@@ -56,6 +56,11 @@ function href(path: string): string {
 	return `${normalized}/`;
 }
 
+/** Encode a username for use as a URL path segment (e.g. "foo@bar.com" → "foo%40bar.com"). */
+function principalHref(username: string): string {
+	return href(`/dav/principals/${encodeURIComponent(username)}`);
+}
+
 function propstatOk(props: string): string {
 	return `
     <d:propstat>
@@ -66,10 +71,33 @@ ${props}
     </d:propstat>`;
 }
 
-function responseFor(hrefValue: string, props: string): string {
+/**
+ * Given a PropFilter and the set of props this response knows about,
+ * returns an XML fragment of self-closing tags for any requested-but-unknown
+ * props (to be placed in a 404 propstat block), or undefined if none.
+ */
+function buildNotFoundProps(filter: PropFilter, knownProps: Set<string>): string | undefined {
+	if (filter === "allprop") return undefined;
+	const unknown = [...filter].filter((p) => !knownProps.has(p));
+	if (unknown.length === 0) return undefined;
+	return unknown.map((p) => `        <d:${p}/>`).join("\n");
+}
+
+function propstatNotFound(props: string): string {
+	return `
+    <d:propstat>
+      <d:prop>
+${props}
+      </d:prop>
+      <d:status>HTTP/1.1 404 Not Found</d:status>
+    </d:propstat>`;
+}
+
+function responseFor(hrefValue: string, props: string, notFoundProps?: string): string {
+	const notFound = notFoundProps ? propstatNotFound(notFoundProps) : "";
 	return `
   <d:response>
-    <d:href>${xmlEscape(hrefValue)}</d:href>${propstatOk(props)}
+    <d:href>${xmlEscape(hrefValue)}</d:href>${propstatOk(props)}${notFound}
   </d:response>`;
 }
 
@@ -211,16 +239,36 @@ export function buildUnauthorizedResponse(c: Context) {
 export function buildEntryResponse(
 	c: Context,
 	user: CaldavUser,
+	requestPath: string,
 	filter: PropFilter = "allprop",
 ) {
-	const extra = shouldInclude(filter, "current-user-principal")
-		? `
+	let extra = "";
+	if (shouldInclude(filter, "current-user-principal")) {
+		extra += `
         <d:current-user-principal>
-          <d:href>${href(`/dav/principals/${user.username}`)}</d:href>
-        </d:current-user-principal>`
-		: "";
+          <d:href>${principalHref(user.username)}</d:href>
+        </d:current-user-principal>`;
+	}
+	if (shouldInclude(filter, "principal-url")) {
+		extra += `
+        <d:principal-URL>
+          <d:href>${principalHref(user.username)}</d:href>
+        </d:principal-URL>`;
+	}
+
+	// RFC 4918 §8.3: the <d:href> in a response MUST match the Request-URI.
+	// Normalize /dav (no trailing slash) to /dav/ but keep / as-is so that
+	// iOS accountsd doesn't reject the response as mismatched.
+	const responseHref = requestPath === "/" ? "/" : href(requestPath);
+
+	// Collect unknown requested props for 404 propstat
+	const knownEntryProps = new Set([
+		"displayname", "resourcetype", "current-user-principal", "principal-url",
+	]);
+	const notFoundProps = buildNotFoundProps(filter, knownEntryProps);
+
 	const props = collectionProps("CalDAV", "<d:collection/>", extra, undefined, filter);
-	return c.body(multistatus(responseFor(href("/dav/"), props)), 207, {
+	return c.body(multistatus(responseFor(responseHref, props, notFoundProps)), 207, {
 		...DAV_HEADERS,
 		"Content-Type": "application/xml; charset=utf-8",
 	});
@@ -238,12 +286,34 @@ export function buildPrincipalResponse(
           <d:href>${href("/dav/projects/")}</d:href>
         </c:calendar-home-set>`;
 	}
+	// username is the user's email address (see verifyAppPassword).
+	// iOS uses calendar-user-address-set to match invites to accounts.
+	if (shouldInclude(filter, "calendar-user-address-set")) {
+		extra += `
+        <c:calendar-user-address-set>
+          <d:href>mailto:${xmlEscape(user.username)}</d:href>
+        </c:calendar-user-address-set>`;
+	}
 	if (shouldInclude(filter, "current-user-principal")) {
 		extra += `
         <d:current-user-principal>
-          <d:href>${href(`/dav/principals/${user.username}`)}</d:href>
+          <d:href>${principalHref(user.username)}</d:href>
         </d:current-user-principal>`;
 	}
+	if (shouldInclude(filter, "principal-url")) {
+		extra += `
+        <d:principal-URL>
+          <d:href>${principalHref(user.username)}</d:href>
+        </d:principal-URL>`;
+	}
+
+	// Collect unknown requested props for 404 propstat
+	const knownPrincipalProps = new Set([
+		"displayname", "resourcetype", "calendar-home-set",
+		"calendar-user-address-set", "current-user-principal", "principal-url",
+	]);
+	const notFoundProps = buildNotFoundProps(filter, knownPrincipalProps);
+
 	const props = collectionProps(
 		user.displayName ?? user.username,
 		"<d:collection/><d:principal/>",
@@ -252,7 +322,7 @@ export function buildPrincipalResponse(
 		filter,
 	);
 	return c.body(
-		multistatus(responseFor(href(`/dav/principals/${user.username}`), props)),
+		multistatus(responseFor(principalHref(user.username), props, notFoundProps)),
 		207,
 		{
 			...DAV_HEADERS,

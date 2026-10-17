@@ -170,7 +170,10 @@ export function registerCaldavRoutes(app: Hono<AppBindings>) {
 		const user = c.get("user");
 		const read = await readBodyWithLimit(c);
 		const filter = parsePropFilter("error" in read ? "" : read.body);
-		return buildEntryResponse(c, user, filter);
+		// Normalize /dav (no trailing slash) to /dav/ so the response href is canonical.
+		// For / we keep / as-is (RFC 4918 §8.3: response href must match Request-URI).
+		const requestPath = c.req.path === "/dav" ? "/dav/" : c.req.path;
+		return buildEntryResponse(c, user, requestPath, filter);
 	};
 
 	const handleProjects = async (c: Context<AppBindings>) => {
@@ -407,6 +410,13 @@ export function registerCaldavRoutes(app: Hono<AppBindings>) {
 
 	app.on("PROPFIND", "/dav", handleEntry);
 	app.on("PROPFIND", "/dav/", handleEntry);
+
+	// iOS sometimes PROPFINDs /principals/ (prefix-less) to discover the principal.
+	// We respond with the same entry-level 207 (current-user-principal etc.) using
+	// the request URI as the response href, so iOS can follow the href chain.
+	// caldavAuth is applied via app.use("/principals/*") below.
+	app.on("PROPFIND", "/principals/", handleEntry);
+	app.on("PROPFIND", "/principals", handleEntry);
 
 	app.on("PROPFIND", "/dav/principals/:username", handlePrincipal);
 	app.on("PROPFIND", "/dav/principals/:username/", handlePrincipal);
